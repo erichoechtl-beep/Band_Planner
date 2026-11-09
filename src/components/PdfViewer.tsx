@@ -140,7 +140,7 @@ export function PdfViewer({ songId, title, onClose }: PdfViewerProps) {
 
         {!missing && status === 'loading' && (
           <div className="flex items-center justify-center gap-3 py-20 text-lg" role="status">
-            <Loader2 className="h-6 w-6 animate-spin text-signal" aria-hidden />
+            <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden />
             PDF wird geladen …
           </div>
         )}

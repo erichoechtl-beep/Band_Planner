@@ -44,7 +44,7 @@ interface SyncRowProps {
 }
 
 function SyncRow({ icon: Icon, tone, title, description, actions, hint }: SyncRowProps) {
-  const tile = tone === 'green' ? 'bg-neon/10 text-neon' : tone === 'cyan' ? 'bg-signal/10 text-signal' : 'bg-stage-raised text-stage-muted';
+  const tile = tone === 'green' ? 'bg-brand/10 text-brand' : tone === 'cyan' ? 'bg-accent/10 text-accent' : 'bg-stage-raised text-stage-muted';
   return (
     <article className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
       <div className="flex min-w-0 flex-1 items-start gap-4">
@@ -181,8 +181,8 @@ export function DataSync() {
   };
 
   const ResultIcon = result?.tone === 'success' ? CheckCircle2 : result?.tone === 'error' ? XCircle : AlertTriangle;
-  const resultColor = result?.tone === 'success' ? 'text-neon' : result?.tone === 'error' ? 'text-danger' : 'text-signal';
-  const resultBorder = result?.tone === 'success' ? 'border-neon/40' : result?.tone === 'error' ? 'border-danger/50' : 'border-signal/40';
+  const resultColor = result?.tone === 'success' ? 'text-brand' : result?.tone === 'error' ? 'text-danger' : 'text-accent';
+  const resultBorder = result?.tone === 'success' ? 'border-brand/40' : result?.tone === 'error' ? 'border-danger/50' : 'border-accent/40';
 
   return (
     <section>

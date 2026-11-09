@@ -103,6 +103,7 @@ Danach einmal im Reiter **Daten-Sync** auf **Band-Stand laden** tippen. Ein neue
 
 ## Bedienhinweise
 
+- **Darstellung:** Standard ist hell (Weiß und Blau). Den Dunkelmodus schaltet man am Handy über **Menü → Darstellung**, am Computer und in der Bühnenansicht über den Mond-Knopf ein. Die Wahl gilt pro Gerät.
 - **Bühnen-Modus** ist auf jedem neuen Gerät voreingestellt. Der Umschalter ist ein Schutz vor Versehen, keine Zugangskontrolle: Jeder kann auf seinem eigenen Gerät in den Admin-Modus wechseln, Änderungen betreffen aber nur dieses Gerät, bis jemand sie exportiert.
 - **Vollbild-Bühnenansicht:** Auf Geräten, die es unterstützen, bleibt das Display an. Bluetooth-Fußpedale blättern, wenn sie Pfeil- oder Bild-Tasten senden. Auf dem iPhone gibt es kein echtes Vollbild im Browser; als installierte App läuft die Ansicht trotzdem bildschirmfüllend.
 - **Transponieren** ändert nur die Anzeige, nie die gespeicherten Daten. Umgerechnet werden Akkordzeilen (`Am  F  C  G`), Inline-Akkorde (`[Am]Text`), Taktstriche (`| C | G |`), beschriftete Zeilen (`Outro: C G`) und Akkorde in Klammern im Song-Ablauf (`Solo (Am)`). Textzeilen bleiben unverändert. Kommt ein H-Akkord vor, gilt der Song als deutsch notiert (H = h, B = b). `Fis`/`Cis`-Schreibweise wird nicht erkannt.
@@ -117,7 +118,7 @@ scripts/generate-icons.mjs Erzeugt die App-Icons (npm run icons)
 src/db/schema.ts           Dexie-Schema, Seed, Validierung, Export, Import, Sync
 src/db/seedData.ts         Deutsche Start-Daten
 src/db/bandActions.ts      Schreibzugriffe für Admin und Notizen
-src/context/               Modus und Online-Status (AdminContext), Meldungen (FeedbackContext)
+src/context/               Modus, Darstellung und Online-Status (AdminContext), Meldungen (FeedbackContext)
 src/lib/transpose.ts       Transponier-Logik
 src/components/            Alle Ansichten
 ```

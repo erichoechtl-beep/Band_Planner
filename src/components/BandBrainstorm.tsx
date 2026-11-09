@@ -50,14 +50,14 @@ function BandNameRow({ entry, rank, maxVotes }: { entry: BandName; rank: number;
 
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap">
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums ${rank === 1 ? 'bg-neon/15 text-neon' : 'bg-stage-raised text-stage-muted'}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums ${rank === 1 ? 'bg-brand/15 text-brand' : 'bg-stage-raised text-stage-muted'}`}>
         {rank}
       </span>
       <div className="min-w-0 flex-1 basis-40">
         <p className="truncate font-semibold">{entry.name}</p>
         <div className="mt-1.5 flex items-center gap-2">
           <div className="h-1.5 max-w-40 flex-1 overflow-hidden rounded-full bg-stage-raised" aria-hidden>
-            <div className="h-full rounded-full bg-neon/70" style={{ width: `${share}%` }} />
+            <div className="h-full rounded-full bg-brand/70" style={{ width: `${share}%` }} />
           </div>
           <span className="text-xs tabular-nums text-stage-subtle">
             {total} {total === 1 ? 'Stimme' : 'Stimmen'}
@@ -65,7 +65,7 @@ function BandNameRow({ entry, rank, maxVotes }: { entry: BandName; rank: number;
         </div>
       </div>
       <span
-        className={`w-10 shrink-0 text-right text-lg font-bold tabular-nums ${score > 0 ? 'text-neon' : score < 0 ? 'text-danger' : 'text-stage-subtle'}`}
+        className={`w-10 shrink-0 text-right text-lg font-bold tabular-nums ${score > 0 ? 'text-brand' : score < 0 ? 'text-danger' : 'text-stage-subtle'}`}
         aria-label={`Bewertung ${score}`}
       >
         {score > 0 ? `+${score}` : score}
@@ -105,7 +105,7 @@ function MoodboardTile({ item, onOpen }: { item: MoodboardItem; onOpen: () => vo
     >
       {url && <img src={url} alt={item.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />}
       {item.title && (
-        <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-6 text-left text-sm font-medium">
+        <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-6 text-left text-sm font-medium text-white">
           {item.title}
         </span>
       )}

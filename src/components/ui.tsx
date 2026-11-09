@@ -4,9 +4,9 @@ import { Fragment, useEffect, useId, useRef, type ButtonHTMLAttributes, type Rea
 type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'destructive';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  destructive: 'bg-danger text-stage-bg font-semibold hover:brightness-110',
-  primary: 'bg-neon text-stage-bg font-semibold hover:bg-[#2fd36b] active:bg-neon-strong',
-  accent: 'bg-signal text-stage-bg font-semibold hover:brightness-110',
+  destructive: 'bg-danger text-on-fill font-semibold hover:brightness-110',
+  primary: 'bg-brand text-on-fill font-semibold hover:bg-brand-strong active:bg-brand-strong',
+  accent: 'bg-accent text-on-fill font-semibold hover:brightness-110',
   secondary: 'border border-stage-line bg-stage-raised text-stage-text font-medium hover:border-stage-strong hover:bg-stage-hover',
   ghost: 'text-stage-muted font-medium hover:bg-stage-raised hover:text-stage-text',
   danger: 'text-danger font-medium hover:bg-danger/10',
@@ -54,10 +54,10 @@ export function IconButton({ icon: Icon, label, variant = 'ghost', className = '
 type BadgeTone = 'green' | 'cyan' | 'amber' | 'neutral';
 
 const BADGE_TONES: Record<BadgeTone, string> = {
-  green: 'bg-neon/10 text-neon',
-  cyan: 'bg-signal/10 text-signal',
+  green: 'bg-brand/10 text-brand',
+  cyan: 'bg-accent/10 text-accent',
   amber: 'bg-warn/10 text-warn',
-  neutral: 'bg-white/[0.06] text-stage-muted',
+  neutral: 'bg-stage-raised text-stage-muted',
 };
 
 export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; children: ReactNode }) {
@@ -70,7 +70,7 @@ export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; childr
 
 /** Kennzahl mit kleiner Beschriftung, z. B. Tonart oder Tempo. */
 export function Stat({ label, value, tone = 'neutral', size = 'md' }: { label: string; value: string; tone?: 'green' | 'cyan' | 'amber' | 'neutral'; size?: 'md' | 'xl' }) {
-  const color = tone === 'green' ? 'text-neon' : tone === 'cyan' ? 'text-signal' : tone === 'amber' ? 'text-warn' : 'text-stage-text';
+  const color = tone === 'green' ? 'text-brand' : tone === 'cyan' ? 'text-accent' : tone === 'amber' ? 'text-warn' : 'text-stage-text';
   return (
     <div className={`rounded-xl border border-stage-line bg-stage-surface ${size === 'xl' ? 'px-4 py-2.5 sm:px-5 sm:py-3' : 'px-3 py-2'}`}>
       <div className="eyebrow">{label}</div>
@@ -96,7 +96,7 @@ export function StructureFlow({ structure, size = 'md' }: { structure: string; s
             <li className={`rounded-md border border-stage-line bg-stage-raised font-semibold ${pill}`}>
               {match ? (
                 <>
-                  {match[1]} <span className="font-mono font-bold text-signal">{match[2]}</span>
+                  {match[1]} <span className="font-mono font-bold text-accent">{match[2]}</span>
                 </>
               ) : (
                 part
@@ -154,7 +154,7 @@ export function Modal({ title, subtitle, onClose, children, size = 'lg', layer =
 
   return (
     <div
-      className={`fixed inset-0 flex items-stretch justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4 ${layer === 'top' ? 'z-[60]' : 'z-50'}`}
+      className={`fixed inset-0 flex items-stretch justify-center bg-backdrop/60 backdrop-blur-sm sm:items-center sm:p-4 ${layer === 'top' ? 'z-[60]' : 'z-50'}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -217,7 +217,7 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 }
 
 export function InfoNote({ icon: Icon, children, tone = 'green' }: { icon: LucideIcon; children: ReactNode; tone?: 'green' | 'amber' }) {
-  const color = tone === 'green' ? 'text-neon' : 'text-warn';
+  const color = tone === 'green' ? 'text-brand' : 'text-warn';
   return (
     <p className="flex items-start gap-3 rounded-xl border border-stage-line bg-stage-surface px-4 py-3 text-sm text-stage-muted">
       <Icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${color}`} aria-hidden />

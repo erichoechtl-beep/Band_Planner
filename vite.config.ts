@@ -23,8 +23,8 @@ export default defineConfig({
         scope: './',
         display: 'standalone',
         orientation: 'any',
-        theme_color: '#0A0E17',
-        background_color: '#0A0E17',
+        theme_color: '#0A0F1C',
+        background_color: '#F4F6FA',
         categories: ['music', 'productivity'],
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

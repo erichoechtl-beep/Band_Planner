@@ -1,37 +1,46 @@
+/** Farben kommen aus CSS-Variablen (src/index.css), damit Hell- und Dunkelmodus umschaltbar sind. */
+const v = (name) => `rgb(var(--c-${name}) / <alpha-value>)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         stage: {
-          bg: '#0A0E17',
-          surface: '#0F1520',
-          raised: '#161D2B',
-          hover: '#1C2536',
-          line: '#222B3B',
-          strong: '#334058',
-          text: '#F1F5F9',
-          muted: '#9DA8BA',
-          subtle: '#6E7A8F',
+          bg: v('bg'),
+          surface: v('surface'),
+          raised: v('raised'),
+          hover: v('hover'),
+          line: v('line'),
+          strong: v('strong'),
+          text: v('text'),
+          muted: v('muted'),
+          subtle: v('subtle'),
         },
-        neon: {
-          DEFAULT: '#22C55E',
-          strong: '#10B981',
+        brand: {
+          DEFAULT: v('brand'),
+          strong: v('brand-strong'),
+          soft: v('brand-soft'),
         },
-        signal: '#06B6D4',
-        warn: '#F5B83D',
-        danger: '#F87171',
+        /** Schriftfarbe auf vollflächigen Brand-, Akzent- und Warnflächen */
+        'on-fill': v('on-fill'),
+        accent: v('accent'),
+        ok: v('ok'),
+        warn: v('warn'),
+        danger: v('danger'),
+        backdrop: v('backdrop'),
       },
       minHeight: { touch: '48px' },
       minWidth: { touch: '48px' },
       fontFamily: {
-        sans: ['"Inter Variable"', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'Arial', 'sans-serif'],
-        mono: ['"JetBrains Mono Variable"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        sans: ['"IBM Plex Sans Variable"', '"IBM Plex Sans"', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'Arial', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       boxShadow: {
-        panel: '0 1px 0 0 rgba(255,255,255,0.03) inset, 0 8px 24px -12px rgba(0,0,0,0.6)',
-        pop: '0 24px 64px -16px rgba(0,0,0,0.75)',
+        panel: 'var(--shadow-panel)',
+        pop: 'var(--shadow-pop)',
       },
     },
   },

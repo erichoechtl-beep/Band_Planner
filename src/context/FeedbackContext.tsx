@@ -94,7 +94,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
             {item.tone === 'error' ? (
               <XCircle className="h-5 w-5 shrink-0 text-danger" aria-hidden />
             ) : (
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-neon" aria-hidden />
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-brand" aria-hidden />
             )}
             <p className="flex-1 py-2 text-sm font-medium">{item.message}</p>
             <button

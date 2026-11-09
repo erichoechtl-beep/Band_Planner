@@ -5,8 +5,58 @@
 @tailwind utilities;
 
 @layer base {
-  html {
+  /* Hell (Standard): Weiß und Blau mit fast schwarzer Schrift */
+  :root {
+    color-scheme: light;
+    --c-bg: 244 246 250;
+    --c-surface: 255 255 255;
+    --c-raised: 238 242 248;
+    --c-hover: 227 233 243;
+    --c-line: 219 226 236;
+    --c-strong: 185 196 212;
+    --c-text: 11 18 32;
+    --c-muted: 68 81 106;
+    --c-subtle: 95 108 130;
+    --c-brand: 29 78 216;
+    --c-brand-strong: 30 64 175;
+    --c-brand-soft: 219 231 255;
+    --c-on-fill: 255 255 255;
+    --c-accent: 3 105 161;
+    --c-ok: 21 128 61;
+    --c-warn: 180 83 9;
+    --c-danger: 220 38 38;
+    --c-backdrop: 11 18 32;
+    --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+    --shadow-pop: 0 24px 48px -12px rgba(15, 23, 42, 0.28);
+  }
+
+  /* Dunkel: ganze App mit .dark, einzelne Bereiche (Kopfzeile) mit .theme-dark */
+  .dark,
+  .theme-dark {
     color-scheme: dark;
+    --c-bg: 10 15 28;
+    --c-surface: 17 24 39;
+    --c-raised: 24 33 52;
+    --c-hover: 31 42 64;
+    --c-line: 38 50 72;
+    --c-strong: 58 74 102;
+    --c-text: 241 245 249;
+    --c-muted: 166 178 197;
+    --c-subtle: 125 138 160;
+    --c-brand: 96 165 250;
+    --c-brand-strong: 59 130 246;
+    --c-brand-soft: 30 58 138;
+    --c-on-fill: 10 15 28;
+    --c-accent: 56 189 248;
+    --c-ok: 74 222 128;
+    --c-warn: 251 191 36;
+    --c-danger: 248 113 113;
+    --c-backdrop: 0 0 0;
+    --shadow-panel: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    --shadow-pop: 0 24px 64px -16px rgba(0, 0, 0, 0.75);
+  }
+
+  html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
   }
@@ -19,13 +69,11 @@
 
   body {
     @apply bg-stage-bg font-sans text-stage-text antialiased;
-    /* Inter: ruhigere Ziffern und eindeutiges l/I */
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
     overscroll-behavior-y: none;
   }
 
   :focus-visible {
-    outline: 2px solid #06b6d4;
+    outline: 2px solid rgb(var(--c-brand));
     outline-offset: 2px;
   }
 
@@ -37,13 +85,13 @@
   }
 
   ::selection {
-    background: rgba(34, 197, 94, 0.35);
+    background: rgb(var(--c-brand) / 0.25);
   }
 }
 
 @layer components {
   .field {
-    @apply min-h-touch w-full rounded-lg border border-stage-line bg-stage-bg px-3 py-2 text-stage-text transition-colors placeholder:text-stage-subtle hover:border-stage-strong focus:border-signal focus:outline-none;
+    @apply min-h-touch w-full rounded-lg border border-stage-line bg-stage-surface px-3 py-2 text-stage-text transition-colors placeholder:text-stage-subtle hover:border-stage-strong focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20;
   }
 
   .field-label {

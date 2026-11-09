@@ -222,7 +222,7 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
           <div>
             <span className="field-label">PDF-Leadsheet</span>
             <div className="flex items-center gap-3 rounded-lg border border-dashed border-stage-strong bg-stage-bg p-2 pl-3">
-              <FileText className={`h-5 w-5 shrink-0 ${currentPdfName ? 'text-signal' : 'text-stage-subtle'}`} aria-hidden />
+              <FileText className={`h-5 w-5 shrink-0 ${currentPdfName ? 'text-accent' : 'text-stage-subtle'}`} aria-hidden />
               <span className={`min-w-0 flex-1 truncate text-sm ${currentPdfName ? 'font-medium' : 'text-stage-muted'}`}>
                 {currentPdfName ?? 'Kein PDF verknüpft'}
               </span>
@@ -422,7 +422,7 @@ export function SongManager() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <span className="truncate font-medium">{song.title}</span>
-                      {song.pdfName && <FileText className="h-4 w-4 shrink-0 text-signal" aria-label="mit PDF" />}
+                      {song.pdfName && <FileText className="h-4 w-4 shrink-0 text-accent" aria-label="mit PDF" />}
                     </span>
                     {song.artist && <span className="block truncate text-sm text-stage-muted">{song.artist}</span>}
                     <span className="mt-1.5 flex flex-wrap gap-1.5 sm:hidden">
@@ -432,8 +432,8 @@ export function SongManager() {
                       {song.duration && <Badge>{song.duration}</Badge>}
                     </span>
                   </span>
-                  <span className="hidden w-14 font-mono text-sm font-semibold text-neon sm:block">{song.key || '–'}</span>
-                  <span className="hidden w-16 text-sm tabular-nums text-signal sm:block">{song.bpm ?? '–'}</span>
+                  <span className="hidden w-14 font-mono text-sm font-semibold text-brand sm:block">{song.key || '–'}</span>
+                  <span className="hidden w-16 text-sm tabular-nums text-accent sm:block">{song.bpm ?? '–'}</span>
                   <span className={`hidden w-28 truncate text-sm md:block ${song.tuning && song.tuning !== 'Standard E' ? 'font-medium text-warn' : 'text-stage-muted'}`}>
                     {song.tuning || '–'}
                   </span>

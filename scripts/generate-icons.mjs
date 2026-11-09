@@ -7,16 +7,16 @@ import { deflateSync } from 'node:zlib';
 const outDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'icons');
 mkdirSync(outDir, { recursive: true });
 
-const BG = [0x0a, 0x0e, 0x17];
-const GREEN = [0x22, 0xc5, 0x5e];
-const CYAN = [0x06, 0xb6, 0xd4];
+const BG = [0x1d, 0x4e, 0xd8];
+const WHITE = [0xff, 0xff, 0xff];
+const LIGHT = [0xbf, 0xdb, 0xfe];
 
 // Equalizer-Balken als Anteile der Bildgröße: x, oben, Farbe
 const BARS = [
-  { x: 11 / 64, top: 28 / 64, color: GREEN },
-  { x: 23 / 64, top: 16 / 64, color: CYAN },
-  { x: 35 / 64, top: 22 / 64, color: GREEN },
-  { x: 47 / 64, top: 12 / 64, color: CYAN },
+  { x: 11 / 64, top: 28 / 64, color: WHITE },
+  { x: 23 / 64, top: 16 / 64, color: LIGHT },
+  { x: 35 / 64, top: 22 / 64, color: WHITE },
+  { x: 47 / 64, top: 12 / 64, color: LIGHT },
 ];
 const BAR_WIDTH = 7 / 64;
 const BAR_BOTTOM = 48 / 64;

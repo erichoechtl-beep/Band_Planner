@@ -45,7 +45,7 @@ function SetlistMeta({ songs, compact = false }: { songs: Song[]; compact?: bool
   const changes = countTuningChanges(songs);
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-stage-muted">
-      <span className="font-semibold tabular-nums text-neon">{formatTotalDuration(seconds)}</span>
+      <span className="font-semibold tabular-nums text-brand">{formatTotalDuration(seconds)}</span>
       <span aria-hidden>·</span>
       <span>
         {songs.length} {songs.length === 1 ? 'Song' : 'Songs'}
@@ -73,8 +73,8 @@ function SongColumns({ song }: { song: Song }) {
   const tuning = song.tuning && song.tuning !== STANDARD_TUNING ? song.tuning : '';
   return (
     <>
-      <span className="hidden w-14 font-mono text-sm font-semibold text-neon sm:block">{song.key || '–'}</span>
-      <span className="hidden w-16 text-sm tabular-nums text-signal sm:block">{song.bpm ?? '–'}</span>
+      <span className="hidden w-14 font-mono text-sm font-semibold text-brand sm:block">{song.key || '–'}</span>
+      <span className="hidden w-16 text-sm tabular-nums text-accent sm:block">{song.bpm ?? '–'}</span>
       <span className="hidden w-28 truncate text-sm font-medium text-warn md:block">{tuning}</span>
       <span className="hidden w-12 text-right text-sm tabular-nums text-stage-muted sm:block">{song.duration || '–'}</span>
     </>
@@ -126,7 +126,7 @@ function SortableSongRow({ song, position, onRemove }: { song: Song; position: n
       ref={setNodeRef}
       data-setlist-row={song.title}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`rounded-lg border bg-stage-surface ${isDragging ? 'relative z-10 border-neon shadow-pop' : 'border-transparent hover:border-stage-line'}`}
+      className={`rounded-lg border bg-stage-surface ${isDragging ? 'relative z-10 border-brand shadow-pop' : 'border-transparent hover:border-stage-line'}`}
     >
       <Row className="pl-0 pr-0">
         <button
@@ -192,14 +192,14 @@ function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: S
                 onClick={() => add(song)}
                 className="flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-stage-raised"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neon/10 text-neon">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
                   <Plus className="h-4 w-4" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{song.title}</span>
                   {song.artist && <span className="block truncate text-sm text-stage-muted">{song.artist}</span>}
                 </span>
-                {song.key && <span className="font-mono text-sm text-neon">{song.key}</span>}
+                {song.key && <span className="font-mono text-sm text-brand">{song.key}</span>}
                 {song.duration && <span className="w-12 text-right text-sm tabular-nums text-stage-muted">{song.duration}</span>}
               </button>
             </li>
@@ -354,7 +354,7 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
         )}
 
         {isAdmin && (
-          <Button variant="ghost" icon={Plus} onClick={() => setAdding(true)} className="mt-1 w-full justify-start text-neon hover:text-neon">
+          <Button variant="ghost" icon={Plus} onClick={() => setAdding(true)} className="mt-1 w-full justify-start text-brand hover:text-brand">
             Songs hinzufügen
           </Button>
         )}

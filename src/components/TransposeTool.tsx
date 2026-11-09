@@ -25,7 +25,7 @@ export function TransposeTool({ semitones, originalKey, transposedKey, onChange,
       />
       <div className="min-w-0 flex-1 px-1 text-center" aria-live="polite">
         <div className="eyebrow">Transponieren</div>
-        <div className={`font-mono font-bold leading-tight ${semitones === 0 ? 'text-stage-text' : 'text-neon'} ${large ? 'text-2xl' : 'text-xl'}`}>
+        <div className={`font-mono font-bold leading-tight ${semitones === 0 ? 'text-stage-text' : 'text-brand'} ${large ? 'text-2xl' : 'text-xl'}`}>
           {transposedKey || '–'}
         </div>
         <div className="truncate text-xs text-stage-subtle">

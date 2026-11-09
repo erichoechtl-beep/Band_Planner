@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, FileText, ListOrdered, Maximize, Minimize, M
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { db, type Song } from '../db/schema';
 import { transposeSong } from '../lib/transpose';
-import { StatusBar } from './Header';
+import { StatusBar, ThemeButton } from './Header';
 import { PdfViewer } from './PdfViewer';
 import { SongNotes } from './PersonalNotes';
 import { TransposeTool } from './TransposeTool';
@@ -152,6 +152,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
             Song {currentIndex + 1} <span className="font-medium text-stage-subtle">/ {songs.length}</span>
           </div>
         </div>
+        <ThemeButton />
         <IconButton icon={ListOrdered} label="Setlist anzeigen" onClick={() => setPanel('list')} />
         {fullscreen.isSupported && (
           <IconButton
@@ -161,7 +162,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
           />
         )}
         <div className="absolute inset-x-0 bottom-0 h-0.5 bg-stage-line" aria-hidden>
-          <div className="h-full bg-neon transition-[width]" style={{ width: `${progress}%` }} />
+          <div className="h-full bg-brand transition-[width]" style={{ width: `${progress}%` }} />
         </div>
       </header>
 
@@ -237,7 +238,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
               {tuningChange && <span className="font-semibold text-warn"> · Umstimmen: {nextSong.tuning}</span>}
             </p>
           ) : (
-            <p className="font-semibold text-signal">Letzter Song der Setlist</p>
+            <p className="font-semibold text-accent">Letzter Song der Setlist</p>
           )}
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -253,7 +254,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
             type="button"
             disabled={!nextSong}
             onClick={() => goTo(currentIndex + 1)}
-            className="flex min-h-20 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-neon px-2 text-lg font-bold text-stage-bg transition-colors hover:bg-[#2fd36b] disabled:bg-stage-raised disabled:text-stage-subtle sm:min-h-24 sm:text-xl"
+            className="flex min-h-20 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-brand px-2 text-lg font-bold text-on-fill transition-colors hover:bg-brand-strong disabled:bg-stage-raised disabled:text-stage-subtle sm:min-h-24 sm:text-xl"
           >
             Nächster Song <ChevronRight className="h-7 w-7 shrink-0" aria-hidden />
           </button>
@@ -291,7 +292,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
                       setPanel(null);
                     }}
                     className={`flex min-h-14 w-full items-center gap-3 rounded-lg px-3 text-left transition-colors ${
-                      isCurrent ? 'bg-neon/10 text-neon' : 'hover:bg-stage-raised'
+                      isCurrent ? 'bg-brand/10 text-brand' : 'hover:bg-stage-raised'
                     }`}
                   >
                     <span className={`w-7 shrink-0 text-center text-sm font-semibold tabular-nums ${isCurrent ? '' : 'text-stage-subtle'}`}>
