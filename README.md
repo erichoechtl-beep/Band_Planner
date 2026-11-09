@@ -78,7 +78,7 @@ Den Link einmal **online** öffnen und kurz warten, bis die App vollständig gel
 - **iPhone/iPad (Safari):** Teilen → „Zum Home-Bildschirm“
 - **Android (Chrome):** Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“
 
-Danach einmal im Reiter **Daten-Sync** auf **Band-Stand laden** tippen. Ein neues Gerät startet nämlich mit den Beispieldaten, nicht automatisch mit dem Stand der Band.
+Beim ersten Öffnen mit Internet holt sich das Gerät automatisch den aktuellen Band-Stand von GitHub.
 
 ## Band-Workflow: Neue Songs verteilen
 
@@ -87,17 +87,17 @@ Danach einmal im Reiter **Daten-Sync** auf **Band-Stand laden** tippen. Ein neue
 1. In den **Admin-Bearbeitungsmodus** wechseln und Songs, Setlists und PDFs pflegen.
 2. Unter **Daten-Sync** auf **Band-Daten exportieren** tippen.
 3. Datei verteilen, und zwar auf einem der beiden Wege:
-   - **GitHub:** Die Datei `band-data.json` im Repo unter `public/` ersetzen, committen und pushen. Das geht auch direkt auf github.com per „Upload files“.
+   - **GitHub (empfohlen):** Unter **Daten-Sync** auf **Auf GitHub hochladen** tippen. Das öffnet github.com direkt im Ordner `public/` des Repos. Dort `band-data.json` hineinziehen bzw. auswählen und unten **Commit changes** drücken. Die alte Datei wird dabei ersetzt.
    - **Direkt:** Die Datei per WhatsApp oder AirDrop schicken.
 
 **Bandmitglieder**
 
-- **GitHub:** **Daten-Sync → Band-Stand laden** antippen.
+- **GitHub:** Nichts zu tun. Jedes Gerät prüft beim Öffnen der App, beim Zurückkehren in die App, wenn das Internet wiederkommt, und alle drei Minuten, ob ein neuer Stand vorliegt, und übernimmt ihn automatisch. Wer auf dem eigenen Gerät Änderungen gemacht und nicht exportiert hat, bekommt stattdessen einen Hinweis mit **Übernehmen** oder **Später**. Sofort geht es mit **Daten-Sync → Band-Stand laden**.
 - **Datei:** **Daten-Sync → Datei auswählen** antippen und die empfangene Datei wählen. Das klappt auch ohne Internet.
 
 **Gut zu wissen**
 
-- Nach einem Push dauert es meist ein bis zwei Minuten für den Workflow und bis zu etwa zehn weitere Minuten, bis GitHub Pages die neue Datei überall ausliefert.
+- Nach dem Hochladen dauert es etwa eine Minute, bis GitHub die Seite neu gebaut hat. Danach erhalten alle Geräte den neuen Stand beim nächsten Öffnen oder spätestens nach drei Minuten.
 - Als Admin immer auf demselben Gerät arbeiten und vor dem Sync exportieren. Bei mehreren Admins gewinnt, wer zuletzt exportiert.
 - PDFs und Bilder stecken als Base64 in der JSON-Datei und vergrößern sie. GitHub warnt ab 50 MB und lehnt Dateien über 100 MB ab; auch Messenger setzen Grenzen. Große Fotos werden beim Hochladen ins Moodboard automatisch verkleinert, PDFs nicht.
 

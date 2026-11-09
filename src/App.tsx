@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AutoSyncBanner, useAutoSync } from './components/AutoSync';
 import { BandBrainstorm } from './components/BandBrainstorm';
 import { DataSync } from './components/DataSync';
 import { BottomNav, Header, TABS, type TabId } from './components/Header';
@@ -27,6 +28,8 @@ function stageHash(setlistId: string, index: number): string {
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
+  // Läuft unabhängig von der Ansicht, damit jedes Gerät neue Band-Stände sofort erhält.
+  const autoSync = useAutoSync();
   const [lastTab, setLastTab] = useState<TabId>(route.kind === 'tab' ? route.tab : 'setlists');
 
   useEffect(() => {
@@ -69,6 +72,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <Header activeTab={lastTab} onSelectTab={selectTab} />
+      <AutoSyncBanner {...autoSync} />
       {/* Unten Platz für die Navigationsleiste auf Handy und Tablet */}
       <main className="mx-auto max-w-6xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:pt-8 lg:pb-12">
         {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} />}

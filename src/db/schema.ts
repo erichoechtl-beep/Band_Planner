@@ -468,8 +468,11 @@ export async function applyBandData(file: BandDataFile, source: string): Promise
   });
 }
 
-/** Lädt die im Repo hinterlegte band-data.json. Der relative Pfad funktioniert in jedem Unterordner. */
-export async function fetchBandDataFromServer(): Promise<BandDataFile> {
+/**
+ * Lädt die im Repo hinterlegte band-data.json. Der relative Pfad funktioniert in jedem Unterordner.
+ * `no-store` lädt immer komplett, `no-cache` fragt per ETag nach und überträgt bei unverändertem Stand nichts.
+ */
+export async function fetchBandDataFromServer(cache: RequestCache = 'no-store'): Promise<BandDataFile> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     throw new BandDataError(
       'Du bist gerade offline. Der Server-Sync braucht eine Internetverbindung – deine lokalen Daten bleiben verfügbar.',
@@ -477,7 +480,7 @@ export async function fetchBandDataFromServer(): Promise<BandDataFile> {
   }
   let response: Response;
   try {
-    response = await fetch('./band-data.json', { cache: 'no-store' });
+    response = await fetch('./band-data.json', { cache });
   } catch {
     throw new BandDataError('Der Server ist nicht erreichbar. Bitte prüfe die Internetverbindung und versuche es erneut.');
   }
@@ -488,6 +491,32 @@ export async function fetchBandDataFromServer(): Promise<BandDataFile> {
     throw new BandDataError(`Der Server hat mit einem Fehler geantwortet (Status ${response.status}).`);
   }
   return parseBandDataText(await response.text());
+}
+
+export type AutoSyncDecision = 'skip' | 'apply' | 'ask';
+
+/**
+ * Entscheidet, was mit einem Server-Stand passiert: Neuere Stände werden übernommen,
+ * außer es gibt lokale, nicht exportierte Änderungen – dann wird gefragt.
+ */
+export function decideAutoSync(assessment: ImportAssessment): AutoSyncDecision {
+  if (assessment.isSameVersion || assessment.isOlder) return 'skip';
+  return assessment.hasLocalChanges ? 'ask' : 'apply';
+}
+
+export type AutoSyncResult =
+  | { kind: 'current' }
+  | { kind: 'updated'; file: BandDataFile }
+  | { kind: 'conflict'; file: BandDataFile };
+
+/** Prüft den Server auf einen neueren Band-Stand und übernimmt ihn, wenn dabei nichts verloren geht. */
+export async function autoSyncFromServer(): Promise<AutoSyncResult> {
+  const file = await fetchBandDataFromServer('no-cache');
+  const decision = decideAutoSync(await assessImport(file));
+  if (decision === 'skip') return { kind: 'current' };
+  if (decision === 'ask') return { kind: 'conflict', file };
+  await applyBandData(file, 'Automatisch vom Server');
+  return { kind: 'updated', file };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, CheckCircle2, CloudDownload, Download, FileUp, Loader2, Share2, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CloudDownload, CloudUpload, Download, FileUp, Loader2, Share2, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
@@ -19,6 +19,9 @@ import {
 import { downloadBlob, formatBytes } from '../lib/files';
 import { formatDateTime } from '../lib/time';
 import { Button, InfoNote, PageHeader } from './ui';
+
+/** Öffnet auf GitHub das Hochladen direkt in den public/-Ordner; eine gleichnamige Datei wird ersetzt. */
+const GITHUB_UPLOAD_URL = 'https://github.com/erichoechtl-beep/Band_Planner/upload/main/public';
 
 type Busy = 'export' | 'share' | 'server' | 'file' | null;
 
@@ -215,7 +218,7 @@ export function DataSync() {
           icon={CloudDownload}
           tone="green"
           title="Aktuellen Band-Stand vom Server laden (GitHub-Sync)"
-          description="Lädt die vom Admin veröffentlichte band-data.json und aktualisiert dieses Gerät mit einem Klick."
+          description="Jedes Gerät prüft automatisch beim Öffnen, beim Zurückkehren in die App und alle paar Minuten, ob ein neuer Stand auf GitHub liegt. Mit dem Knopf geht es sofort."
           hint={!isOnline && <p className="mt-2 text-sm font-medium text-warn">Du bist offline – für den Server-Sync wird eine Internetverbindung benötigt.</p>}
           actions={
             <Button variant="primary" icon={busy === 'server' ? Loader2 : CloudDownload} disabled={busy !== null} onClick={syncFromServer}>
@@ -251,12 +254,28 @@ export function DataSync() {
             icon={Download}
             tone="neutral"
             title="Band-Daten exportieren (band-data.json)"
-            description="Enthält Songs, Setlists, Bandnamen und Moodboard inklusive aller PDFs und Bilder. Lege die Datei in den public/-Ordner des Repos oder teile sie direkt mit der Band."
+            description="Enthält Songs, Setlists, Bandnamen und Moodboard inklusive aller PDFs und Bilder."
+            hint={
+              <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-stage-muted">
+                <li>„Band-Daten exportieren“ antippen – die Datei band-data.json wird gespeichert.</li>
+                <li>„Auf GitHub hochladen“ öffnen, die Datei hineinziehen bzw. auswählen.</li>
+                <li>Unten „Commit changes“ drücken. Nach etwa einer Minute holen sich alle Geräte den neuen Stand.</li>
+              </ol>
+            }
             actions={
               <>
                 <Button variant="accent" icon={busy === 'export' ? Loader2 : Download} disabled={busy !== null} onClick={() => exportData('download')}>
                   Band-Daten exportieren
                 </Button>
+                <a
+                  href={GITHUB_UPLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-touch items-center justify-center gap-2 rounded-lg border border-stage-line bg-stage-raised px-4 py-2 text-[15px] font-medium text-stage-text transition-colors hover:border-stage-strong hover:bg-stage-hover"
+                >
+                  <CloudUpload className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} aria-hidden />
+                  Auf GitHub hochladen
+                </a>
                 {canShareFiles && (
                   <Button icon={busy === 'share' ? Loader2 : Share2} disabled={busy !== null} onClick={() => exportData('share')}>
                     Teilen (z. B. WhatsApp)

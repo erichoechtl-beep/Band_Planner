@@ -9,6 +9,8 @@ import {
 } from './bandActions';
 import {
   applyBandData,
+  autoSyncFromServer,
+  decideAutoSync,
   assessImport,
   BandDataError,
   buildBandDataFile,
@@ -223,5 +225,54 @@ describe('GitHub-Sync', () => {
 
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<!doctype html>')));
     await expect(fetchBandDataFromServer()).rejects.toThrow('keine gültige JSON-Datei');
+  });
+});
+
+describe('Automatischer Abgleich', () => {
+  const serveFile = (file: BandDataFile) => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(file)));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+  const newerFile = () => {
+    const file = cloneSeed();
+    file.lastUpdated = '2099-01-01T00:00:00.000Z';
+    file.songs[0].title = 'Neu vom Server';
+    return file;
+  };
+
+  it('entscheidet: neuer übernehmen, gleich/älter überspringen, bei lokalen Änderungen fragen', () => {
+    expect(decideAutoSync({ hasLocalChanges: false, isOlder: false, isSameVersion: false })).toBe('apply');
+    expect(decideAutoSync({ hasLocalChanges: true, isOlder: false, isSameVersion: false })).toBe('ask');
+    expect(decideAutoSync({ hasLocalChanges: false, isOlder: false, isSameVersion: true })).toBe('skip');
+    expect(decideAutoSync({ hasLocalChanges: true, isOlder: true, isSameVersion: false })).toBe('skip');
+  });
+
+  it('übernimmt einen neueren Server-Stand automatisch und behält persönliche Notizen', async () => {
+    await savePersonalNote({ songId: 'song-major-tom', songTitle: 'Major Tom', text: 'Meine Notiz' });
+    const notesBefore = await db.personalNotes.toArray();
+    const file = newerFile();
+    serveFile(file);
+    const result = await autoSyncFromServer();
+    expect(result.kind).toBe('updated');
+    expect((await db.songs.get(file.songs[0].id))?.title).toBe('Neu vom Server');
+    expect((await getBandStatus()).bandDataUpdatedAt).toBe(file.lastUpdated);
+    expect(await db.personalNotes.toArray()).toEqual(notesBefore);
+  });
+
+  it('fragt per ETag nach und lässt einen gleichen Stand unverändert', async () => {
+    const fetchMock = serveFile(cloneSeed());
+    expect((await autoSyncFromServer()).kind).toBe('current');
+    expect(fetchMock).toHaveBeenCalledWith('./band-data.json', { cache: 'no-cache' });
+  });
+
+  it('überschreibt keine lokalen, nicht exportierten Änderungen', async () => {
+    await addBandName('Lokale Idee');
+    const file = newerFile();
+    serveFile(file);
+    const result = await autoSyncFromServer();
+    expect(result.kind).toBe('conflict');
+    expect((await db.songs.get(file.songs[0].id))?.title).not.toBe('Neu vom Server');
+    expect((await db.bandNames.toArray()).some((name) => name.name === 'Lokale Idee')).toBe(true);
   });
 });
