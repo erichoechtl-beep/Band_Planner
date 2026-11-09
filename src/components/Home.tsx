@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, Clock, FileText, FolderOpen, ListMusic, MapPi
 import { useAdmin } from '../context/AdminContext';
 import { db, type Rehearsal } from '../db/schema';
 import { fmtLong, keyToDate, relativeLabel, todayKey } from '../lib/dates';
+import { eventTitle, KIND_STYLE, nextPhrase } from '../lib/events';
 import { groupByStatus, resolveSongs } from '../lib/setlist';
 import { formatDateTime, formatTotalDuration, sumDurations } from '../lib/time';
 import type { TabId } from './Header';
@@ -23,13 +24,14 @@ function greeting(hour: number): string {
 
 function rehearsalLine(next: Rehearsal | undefined, today: string): string {
   if (!next) return 'Noch kein Termin im Kalender – Zeit, die nächste Probe zu planen.';
-  const what = next.title.trim() || 'Probe';
+  const what = next.kind === 'konzert' ? 'Konzert' : 'Probe';
+  const named = next.title.trim() ? ` (${next.title.trim()})` : '';
   const relative = relativeLabel(next.date, today);
   const time = next.time ? ` um ${next.time} Uhr` : '';
-  if (relative === 'Heute') return `Heute ist ${what}${time}. Instrumente stimmen!`;
-  if (relative === 'Morgen') return `Morgen ist ${what}${time}.`;
-  if (relative) return `Nächste ${what} ${relative}.`;
-  return `Nächste ${what} am ${fmtLong.format(keyToDate(next.date))}.`;
+  if (relative === 'Heute') return next.kind === 'konzert' ? `Heute ist Konzert${named}${time}. Toi, toi, toi!` : `Heute ist Probe${time}. Instrumente stimmen!`;
+  if (relative === 'Morgen') return `Morgen ist ${what}${named}${time}.`;
+  if (relative) return `${nextPhrase(next.kind)}${named} ${relative}.`;
+  return `${nextPhrase(next.kind)}${named} am ${fmtLong.format(keyToDate(next.date))}.`;
 }
 
 /** Geschwungene Notenlinien mit ein paar Noten – Dekoration für den Kopfbereich. */
@@ -141,7 +143,7 @@ export function Home({ onNavigate, onStartStage }: HomeProps) {
           <div className="mt-7 flex flex-wrap gap-2">
             {setlist && (
               <Button variant="primary" icon={Play} onClick={() => onStartStage(setlist.id)} disabled={!canStart}>
-                Bühnenansicht starten
+                Probeansicht starten
               </Button>
             )}
             <Button icon={ListMusic} onClick={() => onNavigate('setlists')} className="border-white/10 bg-white/[0.07] hover:bg-white/[0.12]">
@@ -158,13 +160,13 @@ export function Home({ onNavigate, onStartStage }: HomeProps) {
           {next ? (
             <>
               <div className="flex items-start gap-4">
-                <div className="flex w-16 shrink-0 flex-col items-center rounded-xl bg-brand py-2 text-on-fill">
+                <div className={`flex w-16 shrink-0 flex-col items-center rounded-xl py-2 ${KIND_STYLE[next.kind].fill}`}>
                   <span className="text-xs font-semibold uppercase">{keyToDate(next.date).toLocaleDateString('de-DE', { weekday: 'short' })}</span>
                   <span className="text-2xl font-bold leading-none tabular-nums">{keyToDate(next.date).getDate()}</span>
                   <span className="text-xs font-medium">{keyToDate(next.date).toLocaleDateString('de-DE', { month: 'short' })}</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-lg font-semibold">{next.title.trim() || 'Probe'}</p>
+                  <p className={`text-lg font-semibold ${KIND_STYLE[next.kind].text}`}>{eventTitle(next)}</p>
                   {relativeLabel(next.date, today) && <p className="text-sm font-semibold text-brand">{relativeLabel(next.date, today)}</p>}
                   <p className="mt-1 flex flex-wrap gap-x-3 text-sm text-stage-muted">
                     {next.time && (
@@ -184,10 +186,10 @@ export function Home({ onNavigate, onStartStage }: HomeProps) {
               {upcoming.length > 1 && <p className="mt-3 text-sm text-stage-muted">Danach noch {upcoming.length - 1} weitere {upcoming.length === 2 ? 'Termin' : 'Termine'}.</p>}
             </>
           ) : (
-            <p className="text-[15px] text-stage-muted">{isAdmin ? 'Trag die nächste Probe im Kalender ein.' : 'Sobald der Admin eine Probe einträgt, steht sie hier.'}</p>
+            <p className="text-[15px] text-stage-muted">{isAdmin ? 'Trag die nächste Probe oder das nächste Konzert unter „Termine“ ein.' : 'Sobald der Admin einen Termin einträgt, steht er hier.'}</p>
           )}
-          <Button variant="ghost" onClick={() => onNavigate('proben')} className="mt-auto justify-between self-stretch pt-4 text-brand hover:text-brand">
-            Zum Probenkalender
+          <Button variant="ghost" onClick={() => onNavigate('termine')} className="mt-auto justify-between self-stretch pt-4 text-brand hover:text-brand">
+            Zu den Terminen
             <ArrowRight className="h-[18px] w-[18px]" aria-hidden />
           </Button>
         </article>

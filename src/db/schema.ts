@@ -13,7 +13,10 @@ export interface Song {
   artist: string;
   key: string;
   bpm: number | null;
+  /** Wird nicht mehr angezeigt; bleibt nur erhalten, damit ältere Dateien unverändert durchlaufen. */
   tuning: string;
+  /** Name aus VOCALISTS oder leer */
+  leadVocals: string;
   /** Format MM:SS oder leer */
   duration: string;
   structure: string;
@@ -71,13 +74,18 @@ export interface BandDocument {
 }
 
 /** Ein Termin im Probenkalender. Uhrzeit, Titel, Ort und Notiz sind optional. */
+export type EventKind = 'probe' | 'konzert';
+export const EVENT_KINDS: readonly EventKind[] = ['probe', 'konzert'];
+
 export interface Rehearsal {
   id: string;
   /** Format JJJJ-MM-TT */
   date: string;
   /** Format HH:MM oder leer */
   time: string;
-  /** z. B. „Probe“, „Generalprobe“, „Auftritt“ – leer heißt „Probe“ */
+  /** Probe (blau) oder Konzert (orange) */
+  kind: EventKind;
+  /** Optionale Bezeichnung, z. B. „Adventmarkt“; leer zeigt die Art an */
   title: string;
   location: string;
   note: string;
@@ -214,6 +222,18 @@ class BandDatabase extends Dexie {
     this.version(2).stores({ rehearsals: 'id, date' });
     // Version 3: Band-Dokumente im Bereich „Medien“.
     this.version(3).stores({ documents: 'id, createdAt' });
+    // Version 4: Termin-Art (Probe/Konzert) und Lead Vocals. Bestehende Einträge werden ergänzt.
+    this.version(4)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx.table('rehearsals').toCollection().modify((entry: Partial<Rehearsal> & { title: string }) => {
+          if (!entry.kind) entry.kind = /konzert|auftritt|gig|show|festival/i.test(entry.title) ? 'konzert' : 'probe';
+          if (/^(probe|konzert)$/i.test(entry.title.trim())) entry.title = '';
+        });
+        await tx.table('songs').toCollection().modify((song: Partial<Song>) => {
+          if (song.leadVocals === undefined) song.leadVocals = '';
+        });
+      });
     // „populate“ läuft genau einmal beim Anlegen der Datenbank. Löscht der Admin später
     // alle Songs, kommen die Beispieldaten also nicht zurück.
     this.on('populate', (tx) => seedDatabase(tx));
@@ -347,6 +367,7 @@ function parseSong(raw: unknown, index: number): SongFile {
     key: optionalString(raw, 'key', label),
     bpm,
     tuning: optionalString(raw, 'tuning', label),
+    leadVocals: optionalString(raw, 'leadVocals', label),
     duration,
     structure: optionalString(raw, 'structure', label),
     chords: optionalString(raw, 'chords', label),
@@ -426,11 +447,23 @@ function parseRehearsal(raw: unknown, index: number): Rehearsal {
   if (!isValidDate(date)) throw new BandDataError(`${context}: Das Datum „${date}“ entspricht nicht dem Format JJJJ-MM-TT.`);
   const time = optionalString(raw, 'time', context);
   if (time !== '' && !isValidTime(time)) throw new BandDataError(`${context}: Die Uhrzeit „${time}“ entspricht nicht dem Format HH:MM.`);
+  const title = optionalString(raw, 'title', context);
+  let kind: EventKind;
+  if (raw.kind === undefined || raw.kind === null || raw.kind === '') {
+    // Ältere Dateien kennen keine Art: Auftritte und Konzerte am Titel erkennen.
+    kind = /konzert|auftritt|gig|show|festival/i.test(title) ? 'konzert' : 'probe';
+  } else if (EVENT_KINDS.includes(raw.kind as EventKind)) {
+    kind = raw.kind as EventKind;
+  } else {
+    throw new BandDataError(`${context}: Die Art „${String(raw.kind)}“ ist unbekannt (erlaubt: probe, konzert).`);
+  }
   return {
     id: requireString(raw, 'id', context),
     date,
     time,
-    title: optionalString(raw, 'title', context),
+    kind,
+    // „Probe“ bzw. „Konzert“ als Titel ist doppelt gemoppelt – dann zeigt die App die Art an.
+    title: /^(probe|konzert)$/i.test(title.trim()) ? '' : title,
     location: optionalString(raw, 'location', context),
     note: optionalString(raw, 'note', context),
   };

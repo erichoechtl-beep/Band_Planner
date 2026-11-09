@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronRight, FileText, Music, Pencil, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
+import { ChevronRight, FileText, MicVocal, Music, Pencil, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { VOCALISTS } from '../config';
 import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
 import { deleteSong, saveSong, type PdfChange } from '../db/bandActions';
@@ -14,7 +15,6 @@ import { TransposeTool } from './TransposeTool';
 import { Badge, Button, EmptyState, IconButton, Modal, PageHeader, Stat, StructureFlow } from './ui';
 
 const KEY_SUGGESTIONS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'];
-const TUNING_SUGGESTIONS = ['Standard E', 'Drop D', 'Eb-Standard', 'D-Standard', 'Drop C', 'DADGAD', 'Open G'];
 const MAX_PDF_BYTES = 30 * 1024 * 1024;
 
 interface FormState {
@@ -22,7 +22,7 @@ interface FormState {
   artist: string;
   key: string;
   bpm: string;
-  tuning: string;
+  leadVocals: string;
   duration: string;
   structure: string;
   chords: string;
@@ -34,7 +34,7 @@ function toFormState(song: Song | null): FormState {
     artist: song?.artist ?? '',
     key: song?.key ?? '',
     bpm: song?.bpm?.toString() ?? '',
-    tuning: song?.tuning ?? 'Standard E',
+    leadVocals: song?.leadVocals ?? '',
     duration: song?.duration ?? '',
     structure: song?.structure ?? '',
     chords: song?.chords ?? '',
@@ -109,7 +109,8 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
           artist: form.artist.trim(),
           key: form.key.trim(),
           bpm,
-          tuning: form.tuning.trim(),
+          tuning: song?.tuning ?? '',
+          leadVocals: form.leadVocals,
           duration: form.duration.trim(),
           structure: form.structure.trim(),
           chords: form.chords.replace(/\s+$/, ''),
@@ -171,15 +172,17 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
               {fieldError('bpm')}
             </div>
             <div>
-              <label className="field-label" htmlFor="song-tuning">
-                Stimmung
+              <label className="field-label" htmlFor="song-lead">
+                Lead Vocals
               </label>
-              <input id="song-tuning" className="field" list="tuning-suggestions" value={form.tuning} onChange={update('tuning')} placeholder="Standard E" autoComplete="off" />
-              <datalist id="tuning-suggestions">
-                {TUNING_SUGGESTIONS.map((tuning) => (
-                  <option key={tuning} value={tuning} />
+              <select id="song-lead" className="field" value={form.leadVocals} onChange={(event) => setForm((current) => ({ ...current, leadVocals: event.target.value }))}>
+                <option value="">– keine Angabe –</option>
+                {[...VOCALISTS, ...(form.leadVocals && !(VOCALISTS as readonly string[]).includes(form.leadVocals) ? [form.leadVocals] : [])].map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </div>
             <div>
               <label className="field-label" htmlFor="song-duration">
@@ -300,7 +303,7 @@ function SongDetails({ song, onClose, onEdit }: { song: Song; onClose: () => voi
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label="Tonart" value={shown.key || '–'} tone="green" />
           <Stat label="Tempo" value={song.bpm !== null ? `${song.bpm} BPM` : '–'} tone="cyan" />
-          <Stat label="Stimmung" value={song.tuning || '–'} tone={song.tuning && song.tuning !== 'Standard E' ? 'amber' : 'neutral'} />
+          <Stat label="Lead Vocals" value={song.leadVocals || '–'} />
           <Stat label="Dauer" value={song.duration || '–'} />
         </div>
 
@@ -404,7 +407,7 @@ export function SongManager() {
             <span className="flex-1">Titel</span>
             <span className="w-14">Tonart</span>
             <span className="w-16">BPM</span>
-            <span className="hidden w-28 md:block">Stimmung</span>
+            <span className="hidden w-24 md:block">Lead Vocals</span>
             <span className="w-12 text-right">Dauer</span>
             <span className="w-5" />
           </div>
@@ -428,15 +431,17 @@ export function SongManager() {
                     <span className="mt-1.5 flex flex-wrap gap-1.5 sm:hidden">
                       {song.key && <Badge tone="green">{song.key}</Badge>}
                       {song.bpm !== null && <Badge tone="cyan">{song.bpm} BPM</Badge>}
-                      {song.tuning && song.tuning !== 'Standard E' && <Badge tone="amber">{song.tuning}</Badge>}
+                      {song.leadVocals && (
+                        <Badge>
+                          <MicVocal className="h-3 w-3" aria-hidden /> {song.leadVocals}
+                        </Badge>
+                      )}
                       {song.duration && <Badge>{song.duration}</Badge>}
                     </span>
                   </span>
                   <span className="hidden w-14 font-mono text-sm font-semibold text-brand sm:block">{song.key || '–'}</span>
                   <span className="hidden w-16 text-sm tabular-nums text-accent sm:block">{song.bpm ?? '–'}</span>
-                  <span className={`hidden w-28 truncate text-sm md:block ${song.tuning && song.tuning !== 'Standard E' ? 'font-medium text-warn' : 'text-stage-muted'}`}>
-                    {song.tuning || '–'}
-                  </span>
+                  <span className="hidden w-24 truncate text-sm font-medium md:block">{song.leadVocals || <span className="font-normal text-stage-subtle">–</span>}</span>
                   <span className="hidden w-12 text-right text-sm tabular-nums text-stage-muted sm:block">{song.duration || '–'}</span>
                   <ChevronRight className="h-5 w-5 shrink-0 text-stage-subtle" aria-hidden />
                 </button>

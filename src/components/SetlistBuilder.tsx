@@ -25,6 +25,7 @@ import {
   CircleMinus,
   GripVertical,
   ListMusic,
+  MicVocal,
   Pencil,
   Play,
   Plus,
@@ -43,7 +44,6 @@ import { formatTotalDuration, sumDurations } from '../lib/time';
 import { NoteButton } from './SongNotes';
 import { Badge, Button, EmptyState, IconButton, InfoNote, Modal, PageHeader } from './ui';
 
-const STANDARD_TUNING = 'Standard E';
 
 const STATUS_STYLE: Record<SongStatus, { icon: LucideIcon; color: string; dot: string; description: string }> = {
   fix: { icon: CircleCheck, color: 'text-ok', dot: 'bg-ok', description: 'Wird gespielt' },
@@ -51,19 +51,10 @@ const STATUS_STYLE: Record<SongStatus, { icon: LucideIcon; color: string; dot: s
   raus: { icon: CircleMinus, color: 'text-stage-subtle', dot: 'bg-stage-strong', description: 'Steht zur Wahl, wird nicht gespielt' },
 };
 
-function countTuningChanges(songs: Song[]): number {
-  let changes = 0;
-  for (let i = 1; i < songs.length; i++) {
-    if ((songs[i].tuning || STANDARD_TUNING) !== (songs[i - 1].tuning || STANDARD_TUNING)) changes += 1;
-  }
-  return changes;
-}
-
 function SetlistMeta({ setlist, songsById, compact = false }: { setlist: Setlist; songsById: Map<string, Song>; compact?: boolean }) {
   const groups = groupByStatus(setlist, resolveSongs(setlist, songsById));
   const fix = sumDurations(groups.fix.map((song) => song.duration));
   const offen = sumDurations(groups.offen.map((song) => song.duration));
-  const changes = countTuningChanges(groups.fix);
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-stage-muted">
       <span className="font-semibold tabular-nums text-brand">{formatTotalDuration(fix.seconds)}</span>
@@ -79,14 +70,6 @@ function SetlistMeta({ setlist, songsById, compact = false }: { setlist: Setlist
           </span>
         </>
       )}
-      {!compact && changes > 0 && (
-        <>
-          <span aria-hidden>·</span>
-          <span className="text-warn">
-            {changes} {changes === 1 ? 'Umstimmung' : 'Umstimmungen'}
-          </span>
-        </>
-      )}
       {!compact && fix.missing > 0 && (
         <>
           <span aria-hidden>·</span>
@@ -99,19 +82,17 @@ function SetlistMeta({ setlist, songsById, compact = false }: { setlist: Setlist
 
 /** Spalten der Song-Liste: auf breiten Bildschirmen tabellarisch, auf dem Handy unter dem Titel. */
 function SongColumns({ song }: { song: Song }) {
-  const tuning = song.tuning && song.tuning !== STANDARD_TUNING ? song.tuning : '';
   return (
     <>
       <span className="hidden w-14 font-mono text-sm font-semibold text-brand sm:block">{song.key || '–'}</span>
       <span className="hidden w-14 text-sm tabular-nums text-accent sm:block">{song.bpm ?? '–'}</span>
-      <span className="hidden w-28 truncate text-sm font-medium text-warn lg:block">{tuning}</span>
+      <span className="hidden w-24 truncate text-sm font-medium lg:block">{song.leadVocals || <span className="font-normal text-stage-subtle">–</span>}</span>
       <span className="hidden w-12 text-right text-sm tabular-nums text-stage-muted sm:block">{song.duration || '–'}</span>
     </>
   );
 }
 
 function SongTitleCell({ song, position, muted }: { song: Song; position: number | null; muted: boolean }) {
-  const tuning = song.tuning && song.tuning !== STANDARD_TUNING ? song.tuning : '';
   return (
     <>
       <span className="w-7 shrink-0 text-center text-sm font-semibold tabular-nums text-stage-subtle">
@@ -123,10 +104,14 @@ function SongTitleCell({ song, position, muted }: { song: Song; position: number
         <span className="mt-0.5 flex flex-wrap gap-1.5 sm:hidden">
           {song.key && <Badge tone="green">{song.key}</Badge>}
           {song.bpm !== null && <Badge tone="cyan">{song.bpm} BPM</Badge>}
-          {tuning && <Badge tone="amber">{tuning}</Badge>}
+          {song.leadVocals && (
+            <Badge>
+              <MicVocal className="h-3 w-3" aria-hidden /> {song.leadVocals}
+            </Badge>
+          )}
           {song.duration && <Badge>{song.duration}</Badge>}
         </span>
-        {tuning && <span className="mt-0.5 hidden truncate text-xs font-medium text-warn sm:block lg:hidden">{tuning}</span>}
+        {song.leadVocals && <span className="mt-0.5 hidden truncate text-xs font-medium text-stage-muted sm:block lg:hidden">Lead: {song.leadVocals}</span>}
       </span>
     </>
   );
@@ -140,7 +125,7 @@ function ListHead({ editable }: { editable: boolean }) {
       <span className="flex-1">Titel</span>
       <span className="w-14">Tonart</span>
       <span className="w-14">BPM</span>
-      <span className="hidden w-28 lg:block">Stimmung</span>
+      <span className="hidden w-24 lg:block">Lead</span>
       <span className="w-12 text-right">Dauer</span>
       <span className="w-12 text-center">Notiz</span>
       {editable && <span className="w-12 sm:w-[7.5rem]" />}
@@ -558,7 +543,7 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
           </div>
         )}
         <Button variant="primary" icon={Play} onClick={onStartStage} disabled={playable === 0} className="sm:shrink-0">
-          Bühnenansicht starten
+          Probeansicht starten
         </Button>
       </div>
 

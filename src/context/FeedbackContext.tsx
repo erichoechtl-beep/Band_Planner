@@ -83,7 +83,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         </Modal>
       )}
 
-      {/* Oben statt unten: Meldungen dürfen die großen Song-Tasten der Bühnenansicht nie verdecken. */}
+      {/* Oben statt unten: Meldungen dürfen die großen Song-Tasten der Probeansicht nie verdecken. */}
       <div className="pointer-events-none fixed inset-x-0 top-[env(safe-area-inset-top)] z-[70] flex flex-col items-center gap-2 p-3" aria-live="polite">
         {toasts.map((item) => (
           <div

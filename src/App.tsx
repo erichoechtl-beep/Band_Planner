@@ -12,14 +12,16 @@ import { StageView } from './components/StageView';
 type Route = { kind: 'tab'; tab: TabId } | { kind: 'stage'; setlistId: string; index: number };
 
 // Hash-Routing funktioniert in jedem GitHub-Pages-Unterordner. Die Zurück-Taste verlässt so die
-// Bühnenansicht, und beim Neuladen bleibt die aktuelle Song-Position erhalten.
+// Probeansicht, und beim Neuladen bleibt die aktuelle Song-Position erhalten.
 function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/');
   if (parts[0] === 'buehne' && parts[1]) {
     const index = Number(parts[2]);
     return { kind: 'stage', setlistId: decodeURIComponent(parts[1]), index: Number.isInteger(index) && index >= 0 ? index : 0 };
   }
-  const tab = TABS.find(({ id }) => id === parts[0]);
+  // Frühere Adresse des Kalenders weiterhin unterstützen
+  const target = parts[0] === 'proben' ? 'termine' : parts[0];
+  const tab = TABS.find(({ id }) => id === target);
   // Ohne (oder mit veraltetem) Ziel öffnet die App auf der Startseite.
   return { kind: 'tab', tab: tab?.id ?? 'start' };
 }
@@ -53,7 +55,7 @@ export default function App() {
     window.location.hash = stageHash(setlistId, 0);
   }, []);
 
-  // Blättern ersetzt den Verlaufseintrag: „Zurück“ führt direkt aus der Bühnenansicht heraus.
+  // Blättern ersetzt den Verlaufseintrag: „Zurück“ führt direkt aus der Probeansicht heraus.
   const handleStageIndex = useCallback((setlistId: string, index: number) => {
     window.history.replaceState(null, '', stageHash(setlistId, index));
   }, []);
@@ -80,7 +82,7 @@ export default function App() {
         {route.tab === 'start' && <Home onNavigate={selectTab} onStartStage={startStage} />}
         {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} />}
         {route.tab === 'songs' && <SongManager />}
-        {route.tab === 'proben' && <Rehearsals />}
+        {route.tab === 'termine' && <Rehearsals />}
         {route.tab === 'medien' && <Media />}
         {route.tab === 'sync' && <DataSync />}
       </main>

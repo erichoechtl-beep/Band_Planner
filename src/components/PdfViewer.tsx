@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Download, FileWarning, Loader2, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Download, FileWarning, Loader2, Minus, Pause, Play, Plus, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { db } from '../db/schema';
 import { downloadBlob } from '../lib/files';
 import { Button, IconButton, Modal } from './ui';
@@ -25,29 +25,73 @@ function loadPdfEngine(): Promise<PdfEngine> {
 }
 
 const ZOOM_STEPS = [1, 1.25, 1.5, 2, 3];
+const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+/** Ohne bekannte Songlänge: so viele Pixel pro Sekunde */
+const DEFAULT_SPEED = 30;
+
+/**
+ * Lässt das PDF gleichmäßig nach unten gleiten. Das Grundtempo ist so gewählt, dass das Leadsheet
+ * ungefähr in der Länge des Songs durchläuft; mit „Schneller“/„Langsamer“ lässt es sich anpassen.
+ * Scrollt man von Hand, läuft der Bildlauf von der neuen Stelle aus weiter.
+ */
+function useAutoScroll(scrollerRef: RefObject<HTMLDivElement | null>, durationSeconds: number | null) {
+  const [running, setRunning] = useState(false);
+  const [speedIndex, setSpeedIndex] = useState(2);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!running || !scroller) return;
+    const max = () => scroller.scrollHeight - scroller.clientHeight;
+    const base = durationSeconds ? Math.max(8, max() / (durationSeconds * 0.92)) : DEFAULT_SPEED;
+    let position = scroller.scrollTop;
+    let last = performance.now();
+    let frame = 0;
+    const step = (now: number) => {
+      const seconds = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (Math.abs(scroller.scrollTop - position) > 3) position = scroller.scrollTop;
+      position = Math.min(max(), position + base * SPEED_STEPS[speedIndex] * seconds);
+      scroller.scrollTop = position;
+      if (position >= max() - 1) {
+        setRunning(false);
+        return;
+      }
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [running, speedIndex, durationSeconds, scrollerRef]);
+
+  return { running, setRunning, speedIndex, setSpeedIndex };
+}
 
 interface PdfViewerProps {
   songId: string;
   title: string;
+  /** Songlänge in Sekunden – bestimmt das Grundtempo des automatischen Bildlaufs */
+  durationSeconds?: number | null;
   onClose: () => void;
 }
 
 /** Leadsheet eines Songs aus der lokalen Datenbank. */
-export function PdfViewer({ songId, title, onClose }: PdfViewerProps) {
+export function PdfViewer({ songId, title, durationSeconds = null, onClose }: PdfViewerProps) {
   const pdf = useLiveQuery(() => db.pdfs.get(songId), [songId], null);
-  return <PdfModal title={title} file={pdf} onClose={onClose} />;
+  return <PdfModal title={title} file={pdf} durationSeconds={durationSeconds} onClose={onClose} />;
 }
 
 interface PdfModalProps {
   title: string;
   /** null = wird geladen, undefined = nicht vorhanden */
   file: { name: string; data: ArrayBuffer } | null | undefined;
+  durationSeconds?: number | null;
   onClose: () => void;
 }
 
 /** Zeigt ein beliebiges PDF seitenweise an – offline, mit Zoom und Download. */
-export function PdfModal({ title, file: pdf, onClose }: PdfModalProps) {
+export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: PdfModalProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const autoScroll = useAutoScroll(scrollerRef, durationSeconds);
+  const [canScroll, setCanScroll] = useState(false);
   const pagesRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(0);
   const [width, setWidth] = useState(0);
@@ -123,6 +167,27 @@ export function PdfModal({ title, file: pdf, onClose }: PdfModalProps) {
     };
   }, [data, width, zoom, title, attempt]);
 
+  // Ob es überhaupt etwas zu scrollen gibt, hängt von Seitenzahl, Zoom und Bildschirm ab.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || status !== 'ready') return;
+    const measure = () => setCanScroll(scroller.scrollHeight - scroller.clientHeight > 24);
+    measure();
+    const timer = window.setTimeout(measure, 400);
+    return () => window.clearTimeout(timer);
+  }, [status, pageCount, zoom, width]);
+
+  // Leertaste startet und stoppt den Bildlauf (auch per Bluetooth-Tastatur oder Pedal).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== ' ' || (event.target as HTMLElement | null)?.closest('input, textarea, button')) return;
+      event.preventDefault();
+      if (canScroll) autoScroll.setRunning((value) => !value);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canScroll, autoScroll]);
+
   const download = () => {
     if (pdf) downloadBlob(new Blob([pdf.data], { type: 'application/pdf' }), pdf.name);
   };
@@ -148,7 +213,8 @@ export function PdfModal({ title, file: pdf, onClose }: PdfModalProps) {
         </div>
       }
     >
-      <div ref={scrollerRef} className="relative h-full overflow-auto bg-stage-bg p-2">
+      <div className="relative h-full">
+      <div ref={scrollerRef} className="h-full overflow-auto bg-stage-bg p-2 pb-28">
         <div ref={pagesRef} className="flex w-max min-w-full flex-col gap-2" />
 
         {!missing && status === 'loading' && (
@@ -191,6 +257,44 @@ export function PdfModal({ title, file: pdf, onClose }: PdfModalProps) {
             )}
           </div>
         )}
+      </div>
+
+      {status === 'ready' && !missing && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-stage-line bg-stage-surface/95 p-1.5 shadow-pop backdrop-blur" role="group" aria-label="Automatischer Bildlauf">
+            <IconButton
+              icon={Minus}
+              label="Langsamer"
+              disabled={autoScroll.speedIndex === 0}
+              onClick={() => autoScroll.setSpeedIndex(autoScroll.speedIndex - 1)}
+              className="rounded-full"
+            />
+            <button
+              type="button"
+              onClick={() => autoScroll.setRunning(!autoScroll.running)}
+              disabled={!canScroll}
+              aria-pressed={autoScroll.running}
+              title={canScroll ? 'Leertaste startet und stoppt' : 'Das PDF passt komplett auf den Bildschirm'}
+              className={`flex min-h-touch items-center gap-2 rounded-full px-5 text-[15px] font-semibold transition-colors disabled:opacity-40 ${
+                autoScroll.running ? 'bg-stage-text text-stage-surface' : 'bg-brand text-on-fill hover:bg-brand-strong'
+              }`}
+            >
+              {autoScroll.running ? <Pause className="h-[18px] w-[18px]" aria-hidden /> : <Play className="h-[18px] w-[18px]" aria-hidden />}
+              {autoScroll.running ? 'Pause' : 'Auto-Scroll'}
+            </button>
+            <span className="w-12 text-center text-sm font-semibold tabular-nums text-stage-muted" aria-live="polite" aria-label={`Tempo ${SPEED_STEPS[autoScroll.speedIndex]}-fach`}>
+              {SPEED_STEPS[autoScroll.speedIndex].toLocaleString('de-DE')}×
+            </span>
+            <IconButton
+              icon={Plus}
+              label="Schneller"
+              disabled={autoScroll.speedIndex === SPEED_STEPS.length - 1}
+              onClick={() => autoScroll.setSpeedIndex(autoScroll.speedIndex + 1)}
+              className="rounded-full"
+            />
+          </div>
+        </div>
+      )}
       </div>
     </Modal>
   );

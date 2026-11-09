@@ -27,6 +27,8 @@ export default {
         /** Schriftfarbe auf vollflächigen Brand-, Akzent- und Warnflächen */
         'on-fill': v('on-fill'),
         accent: v('accent'),
+        /** Konzerte im Kalender */
+        concert: v('concert'),
         ok: v('ok'),
         warn: v('warn'),
         danger: v('danger'),

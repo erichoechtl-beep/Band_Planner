@@ -286,7 +286,7 @@ describe('Automatischer Abgleich', () => {
 
 describe('Probenkalender und Freitext', () => {
   it('exportiert und importiert Termine und Freitext verlustfrei', async () => {
-    await saveRehearsal(null, { date: '2026-12-03', time: '19:30', title: 'Probe', location: 'Proberaum', note: 'Neue Songs' });
+    await saveRehearsal(null, { date: '2026-12-03', time: '19:30', kind: 'probe', title: '', location: 'Proberaum', note: 'Neue Songs' });
     await saveBrainstormText('Mehr Zugaben einplanen');
     expect((await getBandStatus()).hasLocalChanges).toBe(true);
     const exported = await buildBandDataFile();
@@ -348,7 +348,7 @@ describe('Setlist-Status und Dokumente', () => {
 
   it('fügt Songs mit gewähltem Status hinzu', async () => {
     const setlist = (await db.setlists.toArray())[0];
-    await saveSong(null, { title: 'Neu', artist: '', key: '', bpm: null, tuning: '', duration: '', structure: '', chords: '' }, { kind: 'keep' });
+    await saveSong(null, { title: 'Neu', artist: '', key: '', bpm: null, tuning: '', leadVocals: '', duration: '', structure: '', chords: '' }, { kind: 'keep' });
     const added = (await db.songs.toArray()).find((song) => song.title === 'Neu')!;
     await addSongToSetlist(setlist.id, added.id, 'offen');
     const after = await db.setlists.get(setlist.id);
@@ -381,5 +381,56 @@ describe('Setlist-Status und Dokumente', () => {
   it('akzeptiert ältere Dateien ohne Dokumente', () => {
     const { documents: _d, ...older } = cloneSeed();
     expect(parseBandData(older).documents).toEqual([]);
+  });
+});
+
+describe('Termin-Art und Lead Vocals', () => {
+  it('erkennt bei älteren Dateien die Art am Titel und räumt doppelte Titel auf', () => {
+    const file = cloneSeed() as unknown as Record<string, unknown>;
+    file.rehearsals = [
+      { id: 'r1', date: '2026-12-05', title: 'Auftritt Adventmarkt' },
+      { id: 'r2', date: '2026-12-01', title: 'Probe' },
+      { id: 'r3', date: '2026-12-02', kind: 'konzert', title: '' },
+    ];
+    const parsed = parseBandData(file);
+    expect(parsed.rehearsals.map((entry) => [entry.kind, entry.title])).toEqual([
+      ['konzert', 'Auftritt Adventmarkt'],
+      ['probe', ''],
+      ['konzert', ''],
+    ]);
+    file.rehearsals = [{ id: 'r1', date: '2026-12-05', kind: 'party' }];
+    expect(() => parseBandData(file)).toThrow('Die Art „party“ ist unbekannt');
+  });
+
+  it('übernimmt Lead Vocals in Export und Import', async () => {
+    const [song] = await db.songs.toArray();
+    await db.songs.update(song.id, { leadVocals: 'Marc' });
+    const exported = await buildBandDataFile();
+    expect(exported.songs.find((entry) => entry.id === song.id)?.leadVocals).toBe('Marc');
+    const { leadVocals: _l, ...older } = exported.songs[0];
+    const parsed = parseBandData({ ...exported, songs: [older] , setlists: [] });
+    expect(parsed.songs[0].leadVocals).toBe('');
+  });
+
+  it('ergänzt beim Upgrade auf Version 4 Termin-Art und Lead Vocals', async () => {
+    db.close();
+    await Dexie.delete('band-planner');
+    const old = new Dexie('band-planner');
+    old.version(3).stores({ songs: 'id, title', setlists: 'id, name', bandNames: 'id, name', moodboard: 'id, createdAt', pdfs: 'songId', personalNotes: 'id, songId, updatedAt', meta: 'key', rehearsals: 'id, date', documents: 'id, createdAt' });
+    await old.open();
+    await old.table('rehearsals').bulkAdd([
+      { id: 'a', date: '2026-12-05', time: '', title: 'Konzert', location: '', note: '' },
+      { id: 'b', date: '2026-12-01', time: '', title: 'Generalprobe', location: '', note: '' },
+    ]);
+    await old.table('songs').add({ id: 's', title: 'Alt', artist: '', key: '', bpm: null, tuning: 'Drop D', duration: '', structure: '', chords: '', pdfName: null });
+    old.close();
+
+    await db.open();
+    const rehearsals = await db.rehearsals.orderBy('date').toArray();
+    expect(rehearsals.map((entry) => [entry.kind, entry.title])).toEqual([
+      ['probe', 'Generalprobe'],
+      ['konzert', ''],
+    ]);
+    expect((await db.songs.get('s'))?.leadVocals).toBe('');
   });
 });

@@ -17,6 +17,7 @@ export const SEED_BAND_DATA: BandDataFile = {
       key: 'A',
       bpm: 126,
       tuning: 'Standard E',
+      leadVocals: '',
       duration: '03:27',
       structure: 'Intro → Strophe → Refrain → Strophe → Refrain → Solo (F#m) → Refrain → Outro',
       chords: [
@@ -42,6 +43,7 @@ export const SEED_BAND_DATA: BandDataFile = {
       key: 'Am',
       bpm: 138,
       tuning: 'Standard E',
+      leadVocals: '',
       duration: '04:58',
       structure: 'Intro → Strophe → Pre-Chorus → Refrain → Strophe → Refrain → Solo (Am) → Refrain → Outro',
       chords: [
@@ -68,6 +70,7 @@ export const SEED_BAND_DATA: BandDataFile = {
       key: 'G',
       bpm: 172,
       tuning: 'Drop D',
+      leadVocals: '',
       duration: '03:41',
       structure: 'Intro → Strophe → Refrain → Strophe → Refrain → Solo (Em) → Refrain → Outro',
       chords: [

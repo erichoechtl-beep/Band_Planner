@@ -1,37 +1,40 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Clock, Lock, MapPin, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Clock, Guitar, Lock, MapPin, Plus, Ticket, Trash2 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
 import { deleteRehearsal, saveRehearsal, type RehearsalInput } from '../db/bandActions';
-import { db, describeError, isValidDate, isValidTime, type Rehearsal } from '../db/schema';
+import { db, describeError, EVENT_KINDS, isValidDate, isValidTime, type EventKind, type Rehearsal } from '../db/schema';
+import { eventTitle, KIND_LABEL, KIND_STYLE } from '../lib/events';
 import { fmtLong, fmtMonthShort, fmtMonthYear, fmtWeekdayShort, keyToDate, relativeLabel, toKey, todayKey } from '../lib/dates';
 import { Button, EmptyState, IconButton, InfoNote, Modal, PageHeader, SectionTitle } from './ui';
 
-const titleOf = (rehearsal: Rehearsal) => rehearsal.title.trim() || 'Probe';
+const titleOf = eventTitle;
 const sortRehearsals = (a: Rehearsal, b: Rehearsal) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const TITLE_SUGGESTIONS = ['Probe', 'Generalprobe', 'Auftritt', 'Soundcheck', 'Aufnahme'];
+const KIND_ICON = { probe: Guitar, konzert: Ticket } as const;
 
 // ---------------------------------------------------------------------------
 // Bausteine
 // ---------------------------------------------------------------------------
 
-function DateBlock({ dateKey, highlight = false }: { dateKey: string; highlight?: boolean }) {
+function DateBlock({ dateKey, kind, highlight = false }: { dateKey: string; kind: EventKind; highlight?: boolean }) {
   const date = keyToDate(dateKey);
   return (
     <div
-      className={`flex w-14 shrink-0 flex-col items-center justify-center rounded-lg py-1.5 leading-tight ${
-        highlight ? 'bg-brand text-on-fill' : 'bg-stage-raised text-stage-text'
-      }`}
+      className={`flex w-14 shrink-0 flex-col items-center justify-center rounded-lg py-1.5 leading-tight ${highlight ? KIND_STYLE[kind].fill : KIND_STYLE[kind].soft}`}
       aria-hidden
     >
-      <span className={`text-[11px] font-semibold uppercase ${highlight ? '' : 'text-stage-muted'}`}>{fmtWeekdayShort.format(date)}</span>
+      <span className="text-[11px] font-semibold uppercase opacity-80">{fmtWeekdayShort.format(date)}</span>
       <span className="text-xl font-bold tabular-nums">{date.getDate()}</span>
-      <span className={`text-[11px] font-medium ${highlight ? '' : 'text-stage-muted'}`}>{fmtMonthShort.format(date)}</span>
+      <span className="text-[11px] font-medium opacity-80">{fmtMonthShort.format(date)}</span>
     </div>
   );
+}
+
+function KindChip({ kind }: { kind: EventKind }) {
+  return <span className={`rounded-md px-1.5 py-0.5 text-xs font-semibold ${KIND_STYLE[kind].soft}`}>{KIND_LABEL[kind]}</span>;
 }
 
 function RehearsalDetails({ rehearsal, today }: { rehearsal: Rehearsal; today: string }) {
@@ -40,7 +43,8 @@ function RehearsalDetails({ rehearsal, today }: { rehearsal: Rehearsal; today: s
     <div className="min-w-0 flex-1">
       <p className="flex flex-wrap items-center gap-x-2 font-semibold">
         {titleOf(rehearsal)}
-        {relative && <span className="rounded-md bg-brand/10 px-1.5 py-0.5 text-xs font-semibold text-brand">{relative}</span>}
+        {rehearsal.title.trim() && <KindChip kind={rehearsal.kind} />}
+        {relative && <span className="rounded-md bg-stage-raised px-1.5 py-0.5 text-xs font-semibold text-stage-muted">{relative}</span>}
       </p>
       <p className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-stage-muted">
         {rehearsal.time && (
@@ -63,7 +67,7 @@ function RehearsalRow({ rehearsal, today, onEdit }: { rehearsal: Rehearsal; toda
   const label = `${titleOf(rehearsal)} am ${fmtLong.format(keyToDate(rehearsal.date))}${rehearsal.time ? `, ${rehearsal.time} Uhr` : ''}`;
   const content = (
     <>
-      <DateBlock dateKey={rehearsal.date} highlight={rehearsal.date === today} />
+      <DateBlock dateKey={rehearsal.date} kind={rehearsal.kind} highlight={rehearsal.date === today} />
       <RehearsalDetails rehearsal={rehearsal} today={today} />
       {onEdit && <ChevronRight className="h-5 w-5 shrink-0 text-stage-subtle" aria-hidden />}
     </>
@@ -85,18 +89,19 @@ function RehearsalRow({ rehearsal, today, onEdit }: { rehearsal: Rehearsal; toda
 
 function NextRehearsal({ rehearsal, today }: { rehearsal: Rehearsal; today: string }) {
   const relative = relativeLabel(rehearsal.date, today);
+  const Icon = KIND_ICON[rehearsal.kind];
   return (
     <section aria-label="Nächster Termin" className="card mb-6 overflow-hidden">
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="flex items-center gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand text-on-fill">
-            <CalendarDays className="h-7 w-7" aria-hidden />
+          <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${KIND_STYLE[rehearsal.kind].fill}`}>
+            <Icon className="h-7 w-7" aria-hidden />
           </span>
           <div className="min-w-0">
             <p className="eyebrow">Nächster Termin{relative ? ` · ${relative}` : ''}</p>
             <p className="text-xl font-bold tracking-tight sm:text-2xl">{fmtLong.format(keyToDate(rehearsal.date))}</p>
             <p className="mt-0.5 flex flex-wrap gap-x-3 text-[15px] text-stage-muted">
-              <span className="font-semibold text-stage-text">{titleOf(rehearsal)}</span>
+              <span className={`font-semibold ${KIND_STYLE[rehearsal.kind].text}`}>{titleOf(rehearsal)}</span>
               {rehearsal.time && <span>{rehearsal.time} Uhr</span>}
               {rehearsal.location && <span>{rehearsal.location}</span>}
             </p>
@@ -111,7 +116,8 @@ function NextRehearsal({ rehearsal, today }: { rehearsal: Rehearsal; today: stri
 interface CalendarProps {
   month: { year: number; monthIndex: number };
   onMonthChange: (month: { year: number; monthIndex: number }) => void;
-  datesWithEntries: Set<string>;
+  /** Art je Tag; Konzerte haben Vorrang */
+  datesWithEntries: Map<string, EventKind>;
   selected: string | null;
   onSelect: (key: string) => void;
   today: string;
@@ -155,7 +161,9 @@ function MonthCalendar({ month, onMonthChange, datesWithEntries, selected, onSel
         {Array.from({ length: daysInMonth }, (_, index) => {
           const day = index + 1;
           const key = toKey(year, monthIndex, day);
-          const hasEntry = datesWithEntries.has(key);
+          const kind = datesWithEntries.get(key);
+          const hasEntry = kind !== undefined;
+          const style = kind ? KIND_STYLE[kind] : null;
           const isToday = key === today;
           const isSelected = key === selected;
           return (
@@ -164,20 +172,20 @@ function MonthCalendar({ month, onMonthChange, datesWithEntries, selected, onSel
               type="button"
               role="gridcell"
               aria-selected={isSelected}
-              aria-label={`${fmtLong.format(keyToDate(key))}${hasEntry ? ', Termin' : ''}`}
+              aria-label={`${fmtLong.format(keyToDate(key))}${kind ? `, ${KIND_LABEL[kind]}` : ''}`}
               onClick={() => onSelect(key)}
               className="flex h-12 min-w-0 items-center justify-center"
             >
               <span
                 className={`relative flex h-10 w-10 items-center justify-center rounded-full text-[15px] tabular-nums transition-colors ${
-                  hasEntry && key < today
-                    ? 'bg-brand/15 font-semibold text-brand'
-                    : hasEntry
-                    ? 'bg-brand font-bold text-on-fill'
+                  style && key < today
+                    ? `${style.soft} font-semibold`
+                    : style
+                    ? `${style.fill} font-bold`
                     : isSelected
                       ? 'bg-stage-hover font-semibold'
                       : 'hover:bg-stage-raised'
-                } ${isToday ? 'ring-2 ring-brand ring-offset-2 ring-offset-stage-surface' : ''} ${isSelected && hasEntry ? 'ring-2 ring-stage-text ring-offset-2 ring-offset-stage-surface' : ''}`}
+                } ${isToday ? `ring-2 ${style?.ring ?? 'ring-brand'} ring-offset-2 ring-offset-stage-surface` : ''} ${isSelected && hasEntry ? 'ring-2 ring-stage-text ring-offset-2 ring-offset-stage-surface' : ''}`}
               >
                 {day}
               </span>
@@ -185,6 +193,14 @@ function MonthCalendar({ month, onMonthChange, datesWithEntries, selected, onSel
           );
         })}
       </div>
+      <p className="mt-2 flex justify-center gap-5 text-xs font-medium text-stage-muted">
+        {EVENT_KINDS.map((option) => (
+          <span key={option} className="flex items-center gap-1.5">
+            <span className={`h-2.5 w-2.5 rounded-full ${KIND_STYLE[option].dot}`} aria-hidden />
+            {KIND_LABEL[option]}
+          </span>
+        ))}
+      </p>
     </div>
   );
 }
@@ -197,8 +213,8 @@ function RehearsalEditor({ rehearsal, initialDate, onClose }: { rehearsal: Rehea
   const { toast, confirm } = useFeedback();
   const [form, setForm] = useState<RehearsalInput>(
     rehearsal
-      ? { date: rehearsal.date, time: rehearsal.time, title: rehearsal.title, location: rehearsal.location, note: rehearsal.note }
-      : { date: initialDate, time: '19:00', title: 'Probe', location: '', note: '' },
+      ? { date: rehearsal.date, time: rehearsal.time, kind: rehearsal.kind, title: rehearsal.title, location: rehearsal.location, note: rehearsal.note }
+      : { date: initialDate, time: '19:00', kind: 'probe', title: '', location: '', note: '' },
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -213,6 +229,7 @@ function RehearsalEditor({ rehearsal, initialDate, onClose }: { rehearsal: Rehea
       await saveRehearsal(rehearsal?.id ?? null, {
         date: form.date,
         time: form.time,
+        kind: form.kind,
         title: form.title.trim(),
         location: form.location.trim(),
         note: form.note.trim(),
@@ -246,6 +263,29 @@ function RehearsalEditor({ rehearsal, initialDate, onClose }: { rehearsal: Rehea
   return (
     <Modal title={rehearsal ? 'Termin bearbeiten' : 'Neuer Termin'} onClose={onClose} size="sm">
       <form onSubmit={submit} className="space-y-4 p-4 sm:p-5" noValidate>
+        <fieldset>
+          <legend className="field-label">Art</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {EVENT_KINDS.map((option) => {
+              const Icon = KIND_ICON[option];
+              const selected = form.kind === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => set('kind', option)}
+                  className={`flex min-h-[52px] items-center justify-center gap-2 rounded-xl border-2 px-3 text-[15px] font-semibold transition-colors ${
+                    selected ? `border-transparent ${KIND_STYLE[option].fill}` : 'border-stage-line hover:bg-stage-raised'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" aria-hidden />
+                  {KIND_LABEL[option]}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="field-label">Datum *</span>
@@ -257,13 +297,8 @@ function RehearsalEditor({ rehearsal, initialDate, onClose }: { rehearsal: Rehea
           </label>
         </div>
         <label className="block">
-          <span className="field-label">Art des Termins</span>
-          <input className="field" list="termin-arten" value={form.title} onChange={(event) => set('title', event.target.value)} placeholder="Probe" />
-          <datalist id="termin-arten">
-            {TITLE_SUGGESTIONS.map((suggestion) => (
-              <option key={suggestion} value={suggestion} />
-            ))}
-          </datalist>
+          <span className="field-label">Bezeichnung (optional)</span>
+          <input className="field" value={form.title} onChange={(event) => set('title', event.target.value)} placeholder={form.kind === 'konzert' ? 'z. B. Adventmarkt Timelkam' : 'z. B. Generalprobe'} />
         </label>
         <label className="block">
           <span className="field-label">Ort</span>
@@ -315,7 +350,11 @@ export function Rehearsals() {
   const [showPast, setShowPast] = useState(false);
 
   const sorted = useMemo(() => [...(rehearsals ?? [])].sort(sortRehearsals), [rehearsals]);
-  const datesWithEntries = useMemo(() => new Set(sorted.map((entry) => entry.date)), [sorted]);
+  const datesWithEntries = useMemo(() => {
+    const map = new Map<string, EventKind>();
+    for (const entry of sorted) if (map.get(entry.date) !== 'konzert') map.set(entry.date, entry.kind);
+    return map;
+  }, [sorted]);
   if (!rehearsals) return null;
 
   const upcoming = sorted.filter((entry) => entry.date >= today);
@@ -327,8 +366,8 @@ export function Rehearsals() {
   return (
     <div>
       <PageHeader
-        title="Probenkalender"
-        description={upcoming.length === 0 ? 'Proben, Auftritte und andere Band-Termine.' : `${upcoming.length} ${upcoming.length === 1 ? 'anstehender Termin' : 'anstehende Termine'}`}
+        title="Termine"
+        description={upcoming.length === 0 ? 'Proben und Konzerte der Band.' : `${upcoming.length} ${upcoming.length === 1 ? 'anstehender Termin' : 'anstehende Termine'}`}
         action={
           isAdmin && (
             <Button variant="primary" icon={Plus} onClick={() => setEditing({ rehearsal: null, date: selected && selected >= today ? selected : today })}>

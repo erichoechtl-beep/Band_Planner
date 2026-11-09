@@ -18,6 +18,7 @@ import {
 } from '../db/schema';
 import { downloadBlob, formatBytes } from '../lib/files';
 import { formatDateTime } from '../lib/time';
+import { ConnectionStatus } from './Header';
 import { Button, InfoNote, PageHeader } from './ui';
 
 /** Öffnet auf GitHub das Hochladen direkt in den public/-Ordner; eine gleichnamige Datei wird ersetzt. */
@@ -190,6 +191,7 @@ export function DataSync() {
   return (
     <section>
       <PageHeader title="Daten-Sync" description="Den aktuellen Band-Stand laden, importieren oder als Admin verteilen." />
+      <ConnectionStatus />
 
       <div className="card mb-4 p-4 sm:p-5">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">

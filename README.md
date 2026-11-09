@@ -1,6 +1,6 @@
 # Band Planner
 
-Offline-First-PWA für Musikproben und Live-Auftritte: Startseite mit Überblick, Setlists mit Song-Status, Songs mit PDF-Leadsheets, Transponierer, Probenkalender, Medien (Rider, Angebote, Pressetexte) und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
+Offline-First-PWA für Musikproben und Live-Auftritte: Startseite mit Überblick, Setlists mit Song-Status, Songs mit PDF-Leadsheets, Transponierer, Terminkalender für Proben und Konzerte, Medien (Rider, Angebote, Pressetexte) und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
 
 ## Architektur & Funktionsweise
 
@@ -103,14 +103,16 @@ Beim ersten Öffnen mit Internet holt sich das Gerät automatisch den aktuellen 
 
 ## Bedienhinweise
 
-- **Probenkalender:** Im Reiter **Proben** trägt der Admin Termine ein: Datum, optional Uhrzeit, Art (z. B. Probe, Auftritt), Ort und Notiz. Zum Anlegen auf **Termin hinzufügen** tippen oder einen Tag im Kalender wählen, zum Ändern oder Löschen auf den Termin tippen. Termine stecken in der band-data.json und werden wie alles andere verteilt.
-- **Song-Status in der Setlist:** Jeder Song hat einen Status: **Fix in Setlist**, **In Abklärung** oder **Nicht in Setlist**. Der Admin ändert ihn über den Status-Knopf rechts in der Zeile; dort lässt sich ein Song auch ganz entfernen. Die Bühnenansicht spielt erst alle fixen Songs, danach die in Abklärung (markiert); „Nicht in Setlist“ erscheint dort nicht. Die Gesamtdauer zählt nur fixe Songs.
+- **Termine:** Im Reiter **Termine** trägt der Admin Proben (blau) und Konzerte (orange) ein: Datum, optional Uhrzeit, Bezeichnung (z. B. „Adventmarkt“), Ort und Notiz. Zum Anlegen auf **Termin hinzufügen** tippen oder einen Tag im Kalender wählen, zum Ändern oder Löschen auf den Termin tippen. Termine stecken in der band-data.json und werden wie alles andere verteilt.
+- **Lead Vocals:** Bei jedem Song lässt sich auswählen, wer singt (Benji, Marc, Eric). Die Namen stehen in `src/config.ts`, ebenso der Bandname in der Kopfzeile.
+- **Song-Status in der Setlist:** Jeder Song hat einen Status: **Fix in Setlist**, **In Abklärung** oder **Nicht in Setlist**. Der Admin ändert ihn über den Status-Knopf rechts in der Zeile; dort lässt sich ein Song auch ganz entfernen. Die Probeansicht spielt erst alle fixen Songs, danach die in Abklärung (markiert); „Nicht in Setlist“ erscheint dort nicht. Die Gesamtdauer zählt nur fixe Songs.
 - **Persönliche Notizen:** Der kleine Zettel in jeder Setlist-Zeile leuchtet gelb, wenn es eine eigene Notiz gibt. Antippen öffnet die Notiz – das geht für alle, auch im Bühnen-Modus. Notizen bleiben auf dem Gerät.
 - **Medien:** Unter **Medien** liegen eigene Band-Dokumente (Technischer Rider, Stageplot, Angebot, Pressetext, Vertrag, Foto/Logo, Sonstiges – PDF, Bilder oder Office-Dateien bis 10 MB) und darunter alle Leadsheets aus den Songs mit Angabe, in welcher Setlist sie stehen. Hochladen, umbenennen und löschen kann der Admin, ansehen und herunterladen alle.
 - **Startseite:** Beim Öffnen zeigt die App den nächsten Termin, den Stand der Setlist und das Repertoire im Überblick.
-- **Darstellung:** Standard ist hell (Weiß und Blau). Den Dunkelmodus schaltet man am Handy über **Menü → Darstellung**, am Computer und in der Bühnenansicht über den Mond-Knopf ein. Die Wahl gilt pro Gerät.
+- **Darstellung:** Standard ist hell (Weiß und Blau). Den Dunkelmodus schaltet man am Handy über **Menü → Darstellung**, am Computer und in der Probeansicht über den Mond-Knopf ein. Die Wahl gilt pro Gerät.
 - **Bühnen-Modus** ist auf jedem neuen Gerät voreingestellt. Der Umschalter ist ein Schutz vor Versehen, keine Zugangskontrolle: Jeder kann auf seinem eigenen Gerät in den Admin-Modus wechseln, Änderungen betreffen aber nur dieses Gerät, bis jemand sie exportiert.
-- **Vollbild-Bühnenansicht:** Auf Geräten, die es unterstützen, bleibt das Display an. Bluetooth-Fußpedale blättern, wenn sie Pfeil- oder Bild-Tasten senden. Auf dem iPhone gibt es kein echtes Vollbild im Browser; als installierte App läuft die Ansicht trotzdem bildschirmfüllend.
+- **Probeansicht:** Zeigt Song für Song Titel, Tonart (mit Transponieren), Tempo mit Metronom-Puls, Lead Vocals, Dauer, Ablauf und die eigene Notiz. Im Admin-Modus lässt sich der Status (Fix / Abklärung / Raus) direkt umschalten; die Reihenfolge bleibt dabei bis zum Schließen gleich. Im PDF-Leadsheet startet **Auto-Scroll** einen gleichmäßigen Bildlauf, dessen Grundtempo zur Songlänge passt (− / + ändern das Tempo, Leertaste startet und stoppt).
+- **Vollbild:** Auf Geräten, die es unterstützen, bleibt das Display an. Bluetooth-Fußpedale blättern, wenn sie Pfeil- oder Bild-Tasten senden. Auf dem iPhone gibt es kein echtes Vollbild im Browser; als installierte App läuft die Ansicht trotzdem bildschirmfüllend.
 - **Transponieren** ändert nur die Anzeige, nie die gespeicherten Daten. Umgerechnet werden Akkordzeilen (`Am  F  C  G`), Inline-Akkorde (`[Am]Text`), Taktstriche (`| C | G |`), beschriftete Zeilen (`Outro: C G`) und Akkorde in Klammern im Song-Ablauf (`Solo (Am)`). Textzeilen bleiben unverändert. Kommt ein H-Akkord vor, gilt der Song als deutsch notiert (H = h, B = b). `Fis`/`Cis`-Schreibweise wird nicht erkannt.
 - **Beispieldaten:** Tonart, Tempo und Dauer der Start-Songs sind Beispielwerte. Die Akkordfelder enthalten nur Akkordfolgen und sollten vor der ersten Probe geprüft werden.
 
@@ -118,11 +120,11 @@ Beim ersten Öffnen mit Internet holt sich das Gerät automatisch den aktuellen 
 
 ```text
 public/band-data.json      Band-Stand für den GitHub-Sync (vom Admin ersetzt)
-scripts/generate-icons.mjs Erzeugt die App-Icons (npm run icons)
+public/icons/icon.svg      Vorlage der App-Icons; die PNG-Dateien daneben sind daraus gerendert
 src/db/schema.ts           Dexie-Schema, Seed, Validierung, Export, Import, Sync
 src/db/seedData.ts         Deutsche Start-Daten
 src/db/bandActions.ts      Schreibzugriffe für Admin und Notizen
-src/context/               Modus, Darstellung und Online-Status (AdminContext), Meldungen (FeedbackContext)
+src/context/               Modus, Darstellung und Online-Status (AdminContext; angezeigt unter Daten-Sync), Meldungen (FeedbackContext)
 src/lib/transpose.ts       Transponier-Logik
 src/components/            Alle Ansichten
 ```

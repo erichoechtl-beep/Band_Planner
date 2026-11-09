@@ -1,16 +1,17 @@
 import { CalendarDays, Check, Database, FolderOpen, House, ListMusic, Lock, Menu, Moon, Music, Sun, Unlock, type LucideIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { BAND_NAME } from '../config';
 import { useAdmin, type AppMode, type Theme } from '../context/AdminContext';
 import { LogoMark } from './Logo';
 import { IconButton, Modal } from './ui';
 
-export type TabId = 'start' | 'setlists' | 'songs' | 'proben' | 'medien' | 'sync';
+export type TabId = 'start' | 'setlists' | 'songs' | 'termine' | 'medien' | 'sync';
 
 export const TABS: { id: TabId; label: string; short: string; description: string; icon: LucideIcon }[] = [
   { id: 'start', label: 'Start', short: 'Start', description: 'Überblick: nächster Termin und Setlist', icon: House },
   { id: 'setlists', label: 'Setlists', short: 'Setlists', description: 'Konzertabläufe planen und spielen', icon: ListMusic },
   { id: 'songs', label: 'Songs & PDFs', short: 'Songs', description: 'Repertoire, Akkorde und Leadsheets', icon: Music },
-  { id: 'proben', label: 'Proben', short: 'Proben', description: 'Probentermine und Auftritte im Kalender', icon: CalendarDays },
+  { id: 'termine', label: 'Termine', short: 'Termine', description: 'Proben und Konzerte im Kalender', icon: CalendarDays },
   { id: 'medien', label: 'Medien', short: 'Medien', description: 'Rider, Angebote, Pressetexte und Leadsheets', icon: FolderOpen },
   { id: 'sync', label: 'Daten-Sync', short: 'Sync', description: 'Band-Stand laden, exportieren, importieren', icon: Database },
 ];
@@ -25,18 +26,19 @@ const THEMES: { id: Theme; title: string; label: string; description: string; ic
   { id: 'dunkel', title: 'Dunkel', label: 'Dunkle Darstellung', description: 'Blendet nicht auf dunklen Bühnen', icon: Moon },
 ];
 
-export function StatusBar() {
+/** Verbindungsstatus – wird nur im Bereich „Daten-Sync“ angezeigt. */
+export function ConnectionStatus() {
   const { isOnline } = useAdmin();
   return (
-    <div
+    <p
       role="status"
-      className={`flex h-7 items-center justify-center gap-2 border-b px-3 text-xs font-medium ${
-        isOnline ? 'border-stage-line bg-stage-bg text-stage-muted' : 'border-warn/30 bg-warn/15 text-warn'
+      className={`mb-4 flex min-h-touch items-center gap-2.5 rounded-xl border px-4 text-sm font-medium ${
+        isOnline ? 'border-stage-line bg-stage-surface text-stage-muted' : 'border-warn/30 bg-warn/10 text-warn'
       }`}
     >
-      <span className={`h-2 w-2 shrink-0 rounded-full ${isOnline ? 'bg-ok' : 'bg-warn'}`} aria-hidden />
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${isOnline ? 'bg-ok' : 'bg-warn'}`} aria-hidden />
       {isOnline ? 'Online – Einsatzbereit' : 'Offline-Modus – Alle Daten lokal gespeichert'}
-    </div>
+    </p>
   );
 }
 
@@ -92,7 +94,6 @@ export function Header({ activeTab, onSelectTab }: NavProps) {
     <>
       {/* Die Kopfzeile ist in beiden Darstellungen dunkel. */}
       <div className="theme-dark sticky top-0 z-30 bg-stage-bg pt-safe text-stage-text">
-        <StatusBar />
         <header className="border-b border-stage-line bg-stage-surface">
           <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
             <button
@@ -103,7 +104,9 @@ export function Header({ activeTab, onSelectTab }: NavProps) {
             >
               <LogoMark className="h-9 w-9 shrink-0" />
               <div className="min-w-0 leading-tight">
-                <h1 className="truncate text-base font-semibold tracking-tight">Band Planner</h1>
+                <h1 className="truncate text-base font-semibold tracking-tight">
+                  Band Planner <span className="font-normal text-stage-subtle">–</span> <span className="font-bold tracking-wide text-brand">{BAND_NAME}</span>
+                </h1>
                 <p className={`flex items-center gap-1 truncate text-xs font-medium ${isAdmin ? 'text-brand' : 'text-stage-muted'}`}>
                   {isAdmin ? <Unlock className="h-3 w-3 shrink-0" aria-hidden /> : <Lock className="h-3 w-3 shrink-0" aria-hidden />}
                   <span className="lg:hidden">{isAdmin ? 'Admin · Bearbeitung aktiv' : 'Bühne · Nur Lesen'}</span>

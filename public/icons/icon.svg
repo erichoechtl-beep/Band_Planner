@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Quelle für alle App-Icons (iOS-Homescreen, Android, Favicon). Vollflächig, ohne Rundung – iOS rundet selbst. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1E40AF"/>
+      <stop offset="0.55" stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.22" cy="0.12" r="0.75">
+      <stop offset="0" stop-color="#93C5FD" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#93C5FD" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <g stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="7" fill="none">
+    <path d="M0 404 C 260 360, 620 452, 1024 384"/>
+    <path d="M0 482 C 260 438, 620 530, 1024 462"/>
+    <path d="M0 560 C 260 516, 620 608, 1024 540"/>
+    <path d="M0 638 C 260 594, 620 686, 1024 618"/>
+    <path d="M0 716 C 260 672, 620 764, 1024 696"/>
+  </g>
+  <g fill="#FFFFFF">
+    <ellipse cx="392" cy="706" rx="98" ry="70" transform="rotate(-22 392 706)"/>
+    <ellipse cx="664" cy="636" rx="98" ry="70" transform="rotate(-22 664 636)"/>
+    <rect x="456" y="296" width="34" height="400"/>
+    <rect x="728" y="226" width="34" height="400"/>
+    <polygon points="456,296 762,226 762,310 456,380"/>
+  </g>
+  <ellipse cx="664" cy="636" rx="98" ry="70" transform="rotate(-22 664 636)" fill="#BFDBFE" fill-opacity="0.35"/>
+</svg>
