@@ -1,9 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Image as ImageIcon, Lightbulb, Loader2, Plus, ThumbsDown, ThumbsUp, Trash2, Upload } from 'lucide-react';
+import { Image as ImageIcon, Lightbulb, Loader2, NotebookPen, Plus, Save, ThumbsDown, ThumbsUp, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
-import { addBandName, addMoodboardImage, deleteBandName, deleteMoodboardImage, voteBandName } from '../db/bandActions';
+import { addBandName, addMoodboardImage, deleteBandName, deleteMoodboardImage, saveBrainstormText, voteBandName } from '../db/bandActions';
 import { db, describeError, type BandName, type MoodboardItem } from '../db/schema';
 import { prepareImage } from '../lib/files';
 import { Button, EmptyState, IconButton, Modal, PageHeader, SectionTitle } from './ui';
@@ -148,6 +148,69 @@ function MoodboardLightbox({ item, onClose }: { item: MoodboardItem; onClose: ()
   );
 }
 
+/** Gemeinsamer Freitext der Band: Ideen, Links, Songwünsche. Bearbeiten nur im Admin-Modus. */
+function BrainstormText() {
+  const { isAdmin } = useAdmin();
+  const { toast } = useFeedback();
+  const stored = useLiveQuery(async () => {
+    const entry = await db.meta.get('brainstormText');
+    return typeof entry?.value === 'string' ? entry.value : '';
+  }, []);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  if (stored === undefined) return null;
+  const text = draft ?? stored;
+  const dirty = draft !== null && draft !== stored;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await saveBrainstormText(text.trim());
+      setDraft(null);
+      toast('Freitext gespeichert.');
+    } catch (error) {
+      toast(describeError(error), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="mb-8">
+      <SectionTitle>Freitext</SectionTitle>
+      {isAdmin ? (
+        <div className="card p-3 sm:p-4">
+          <textarea
+            className="field min-h-40 resize-y leading-relaxed"
+            value={text}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Ideen, Songwünsche, Links, Absprachen … alles, was die Band wissen soll."
+            aria-label="Freitext"
+          />
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            {dirty && <span className="mr-auto text-sm font-medium text-warn">Nicht gespeicherte Änderungen</span>}
+            {dirty && (
+              <Button variant="ghost" onClick={() => setDraft(null)}>
+                Verwerfen
+              </Button>
+            )}
+            <Button variant="primary" icon={Save} disabled={!dirty || saving} onClick={save}>
+              Freitext speichern
+            </Button>
+          </div>
+        </div>
+      ) : stored ? (
+        <div className="card whitespace-pre-wrap break-words p-4 text-[15px] leading-relaxed sm:p-5">{stored}</div>
+      ) : (
+        <EmptyState icon={NotebookPen} title="Noch kein Freitext">
+          Hier stehen Ideen und Absprachen, sobald der Admin sie einträgt.
+        </EmptyState>
+      )}
+    </section>
+  );
+}
+
 export function BandBrainstorm() {
   const { isAdmin } = useAdmin();
   const { toast } = useFeedback();
@@ -202,7 +265,9 @@ export function BandBrainstorm() {
 
   return (
     <div>
-      <PageHeader title="Band-Brainstorming" description="Namensideen sammeln, abstimmen und den Look der Band festhalten." />
+      <PageHeader title="Band-Brainstorming" description="Ideen festhalten, Namen abstimmen und den Look der Band sammeln." />
+
+      <BrainstormText />
 
       <div className="grid items-start gap-8 lg:grid-cols-2">
         <section>

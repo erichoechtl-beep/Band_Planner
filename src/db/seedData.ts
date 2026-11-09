@@ -100,6 +100,8 @@ export const SEED_BAND_DATA: BandDataFile = {
     { id: 'name-drop-d-dynastie', name: 'Drop-D-Dynastie', upvotes: 1, downvotes: 2 },
   ],
   moodboard: [],
+  rehearsals: [],
+  brainstormText: '',
 };
 
 export const SEED_PERSONAL_NOTES: PersonalNote[] = [

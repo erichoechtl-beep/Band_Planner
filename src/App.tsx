@@ -4,6 +4,7 @@ import { BandBrainstorm } from './components/BandBrainstorm';
 import { DataSync } from './components/DataSync';
 import { BottomNav, Header, TABS, type TabId } from './components/Header';
 import { PersonalNotes } from './components/PersonalNotes';
+import { Rehearsals } from './components/Rehearsals';
 import { SetlistBuilder } from './components/SetlistBuilder';
 import { SongManager } from './components/SongManager';
 import { StageView } from './components/StageView';
@@ -77,6 +78,7 @@ export default function App() {
       <main className="mx-auto max-w-6xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:pt-8 lg:pb-12">
         {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} />}
         {route.tab === 'songs' && <SongManager />}
+        {route.tab === 'proben' && <Rehearsals />}
         {route.tab === 'brainstorming' && <BandBrainstorm />}
         {route.tab === 'notizen' && <PersonalNotes />}
         {route.tab === 'sync' && <DataSync />}

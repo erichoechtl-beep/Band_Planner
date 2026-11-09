@@ -1,6 +1,6 @@
 # Band Planner
 
-Offline-First-PWA für Musikproben und Live-Auftritte: Setlists, Songs, PDF-Leadsheets, Transponierer, Bandnamen, Moodboard und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
+Offline-First-PWA für Musikproben und Live-Auftritte: Setlists, Songs, PDF-Leadsheets, Transponierer, Probenkalender, Bandnamen, Moodboard, Freitext und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
 
 ## Architektur & Funktionsweise
 
@@ -103,6 +103,7 @@ Beim ersten Öffnen mit Internet holt sich das Gerät automatisch den aktuellen 
 
 ## Bedienhinweise
 
+- **Probenkalender:** Im Reiter **Proben** trägt der Admin Termine ein: Datum, optional Uhrzeit, Art (z. B. Probe, Auftritt), Ort und Notiz. Zum Anlegen auf **Termin hinzufügen** tippen oder einen Tag im Kalender wählen, zum Ändern oder Löschen auf den Termin tippen. Termine und der **Freitext** aus dem Band-Brainstorming stecken in der band-data.json und werden wie alles andere verteilt.
 - **Darstellung:** Standard ist hell (Weiß und Blau). Den Dunkelmodus schaltet man am Handy über **Menü → Darstellung**, am Computer und in der Bühnenansicht über den Mond-Knopf ein. Die Wahl gilt pro Gerät.
 - **Bühnen-Modus** ist auf jedem neuen Gerät voreingestellt. Der Umschalter ist ein Schutz vor Versehen, keine Zugangskontrolle: Jeder kann auf seinem eigenen Gerät in den Admin-Modus wechseln, Änderungen betreffen aber nur dieses Gerät, bis jemand sie exportiert.
 - **Vollbild-Bühnenansicht:** Auf Geräten, die es unterstützen, bleibt das Display an. Bluetooth-Fußpedale blättern, wenn sie Pfeil- oder Bild-Tasten senden. Auf dem iPhone gibt es kein echtes Vollbild im Browser; als installierte App läuft die Ansicht trotzdem bildschirmfüllend.

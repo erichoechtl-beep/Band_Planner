@@ -1,14 +1,15 @@
-import { Check, Database, Lightbulb, ListMusic, Lock, Menu, Moon, Music, StickyNote, Sun, Unlock, type LucideIcon } from 'lucide-react';
+import { CalendarDays, Check, Database, Lightbulb, ListMusic, Lock, Menu, Moon, Music, StickyNote, Sun, Unlock, type LucideIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useAdmin, type AppMode, type Theme } from '../context/AdminContext';
 import { LogoMark } from './Logo';
 import { IconButton, Modal } from './ui';
 
-export type TabId = 'setlists' | 'songs' | 'brainstorming' | 'notizen' | 'sync';
+export type TabId = 'setlists' | 'songs' | 'proben' | 'brainstorming' | 'notizen' | 'sync';
 
 export const TABS: { id: TabId; label: string; short: string; description: string; icon: LucideIcon }[] = [
   { id: 'setlists', label: 'Setlists', short: 'Setlists', description: 'Konzertabläufe planen und spielen', icon: ListMusic },
   { id: 'songs', label: 'Songs & PDFs', short: 'Songs', description: 'Repertoire, Akkorde und Leadsheets', icon: Music },
+  { id: 'proben', label: 'Proben', short: 'Proben', description: 'Probentermine und Auftritte im Kalender', icon: CalendarDays },
   { id: 'brainstorming', label: 'Band-Brainstorming', short: 'Ideen', description: 'Bandnamen abstimmen und Moodboard', icon: Lightbulb },
   { id: 'notizen', label: 'Persönliche Notizen', short: 'Notizen', description: 'Nur auf diesem Gerät gespeichert', icon: StickyNote },
   { id: 'sync', label: 'Daten-Sync', short: 'Sync', description: 'Band-Stand laden, exportieren, importieren', icon: Database },

@@ -1,4 +1,4 @@
-import { db, bandWrite, createId, type PersonalNote, type Song } from './schema';
+import { db, bandWrite, createId, type PersonalNote, type Rehearsal, type Song } from './schema';
 
 export type SongInput = Omit<Song, 'id' | 'pdfName'>;
 
@@ -77,6 +77,27 @@ export function voteBandName(id: string, direction: 'up' | 'down'): Promise<void
 
 export function deleteBandName(id: string): Promise<void> {
   return bandWrite(() => db.bandNames.delete(id));
+}
+
+/** Gemeinsamer Freitext im Band-Brainstorming. */
+export function saveBrainstormText(text: string): Promise<void> {
+  return bandWrite(async () => {
+    await db.meta.put({ key: 'brainstormText', value: text });
+  });
+}
+
+export type RehearsalInput = Omit<Rehearsal, 'id'>;
+
+export function saveRehearsal(id: string | null, input: RehearsalInput): Promise<string> {
+  return bandWrite(async () => {
+    const rehearsalId = id ?? createId();
+    await db.rehearsals.put({ ...input, id: rehearsalId });
+    return rehearsalId;
+  });
+}
+
+export function deleteRehearsal(id: string): Promise<void> {
+  return bandWrite(() => db.rehearsals.delete(id));
 }
 
 export function addMoodboardImage(title: string, mimeType: string, data: ArrayBuffer): Promise<void> {

@@ -1,9 +1,12 @@
 import 'fake-indexeddb/auto';
+import Dexie from 'dexie';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addBandName,
   deleteSong,
+  saveBrainstormText,
+  saveRehearsal,
   savePersonalNote,
   saveSong,
 } from './bandActions';
@@ -274,5 +277,53 @@ describe('Automatischer Abgleich', () => {
     expect(result.kind).toBe('conflict');
     expect((await db.songs.get(file.songs[0].id))?.title).not.toBe('Neu vom Server');
     expect((await db.bandNames.toArray()).some((name) => name.name === 'Lokale Idee')).toBe(true);
+  });
+});
+
+describe('Probenkalender und Freitext', () => {
+  it('exportiert und importiert Termine und Freitext verlustfrei', async () => {
+    await saveRehearsal(null, { date: '2026-12-03', time: '19:30', title: 'Probe', location: 'Proberaum', note: 'Neue Songs' });
+    await saveBrainstormText('Mehr Zugaben einplanen');
+    expect((await getBandStatus()).hasLocalChanges).toBe(true);
+    const exported = await buildBandDataFile();
+    expect(exported.rehearsals).toHaveLength(1);
+    expect(exported.brainstormText).toBe('Mehr Zugaben einplanen');
+
+    const parsed = parseBandDataText(JSON.stringify({ ...exported, lastUpdated: '2099-01-01T00:00:00.000Z' }));
+    await db.rehearsals.clear();
+    await db.meta.put({ key: 'brainstormText', value: '' });
+    await applyBandData(parsed, 'Test');
+    expect((await db.rehearsals.toArray())[0]).toMatchObject({ date: '2026-12-03', time: '19:30', location: 'Proberaum' });
+    expect((await db.meta.get('brainstormText'))?.value).toBe('Mehr Zugaben einplanen');
+  });
+
+  it('akzeptiert ältere Dateien ohne Termine und Freitext', () => {
+    const { rehearsals: _r, brainstormText: _t, ...older } = cloneSeed();
+    const parsed = parseBandData(older);
+    expect(parsed.rehearsals).toEqual([]);
+    expect(parsed.brainstormText).toBe('');
+  });
+
+  it('meldet ungültige Termine auf Deutsch', () => {
+    const file = cloneSeed() as unknown as Record<string, unknown>;
+    file.rehearsals = [{ id: 'r1', date: '2026-02-30' }];
+    expect(() => parseBandData(file)).toThrow('Probentermin 1: Das Datum „2026-02-30“');
+    file.rehearsals = [{ id: 'r1', date: '2026-02-03', time: '25:00' }];
+    expect(() => parseBandData(file)).toThrow('Die Uhrzeit „25:00“');
+  });
+
+  it('übernimmt beim Upgrade einer bestehenden Datenbank alle Daten', async () => {
+    db.close();
+    await Dexie.delete('band-planner');
+    const old = new Dexie('band-planner');
+    old.version(1).stores({ songs: 'id, title', setlists: 'id, name', bandNames: 'id, name', moodboard: 'id, createdAt', pdfs: 'songId', personalNotes: 'id, songId, updatedAt', meta: 'key' });
+    await old.open();
+    await old.table('songs').add({ id: 'song-alt', title: 'Alter Song', artist: '', key: '', bpm: null, tuning: '', duration: '', structure: '', chords: '', pdfName: null });
+    old.close();
+
+    await db.open();
+    expect(await db.songs.toArray()).toEqual([expect.objectContaining({ id: 'song-alt', title: 'Alter Song' })]);
+    expect(await db.rehearsals.count()).toBe(0);
+    expect((await buildBandDataFile()).brainstormText).toBe('');
   });
 });

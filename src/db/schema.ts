@@ -50,6 +50,19 @@ export interface SongPdf {
   data: ArrayBuffer;
 }
 
+/** Ein Termin im Probenkalender. Uhrzeit, Titel, Ort und Notiz sind optional. */
+export interface Rehearsal {
+  id: string;
+  /** Format JJJJ-MM-TT */
+  date: string;
+  /** Format HH:MM oder leer */
+  time: string;
+  /** z. B. „Probe“, „Generalprobe“, „Auftritt“ – leer heißt „Probe“ */
+  title: string;
+  location: string;
+  note: string;
+}
+
 /** Gerätespezifisch – gehört nicht zu den Band-Daten und wird nie exportiert oder überschrieben. */
 export interface PersonalNote {
   id: string;
@@ -65,7 +78,7 @@ interface MetaEntry {
   value: string | boolean | null;
 }
 
-type MetaKey = 'bandDataUpdatedAt' | 'hasLocalChanges' | 'lastExportedAt' | 'lastSyncedAt' | 'lastSyncSource';
+type MetaKey = 'bandDataUpdatedAt' | 'hasLocalChanges' | 'lastExportedAt' | 'lastSyncedAt' | 'lastSyncSource' | 'brainstormText';
 
 // ---------------------------------------------------------------------------
 // Dateiformat band-data.json
@@ -95,6 +108,10 @@ export interface BandDataFile {
   setlists: Setlist[];
   bandNames: BandName[];
   moodboard: MoodboardFile[];
+  /** Fehlt in älteren Dateien und gilt dann als leer. */
+  rehearsals: Rehearsal[];
+  /** Gemeinsamer Freitext im Band-Brainstorming; fehlt in älteren Dateien. */
+  brainstormText: string;
 }
 
 /** Die Band-Daten sind ungültig oder nicht erreichbar. */
@@ -121,7 +138,7 @@ function toTableRecords(file: BandDataFile) {
     ...item,
     data: base64ToArrayBuffer(base64),
   }));
-  return { songs, pdfs, setlists: file.setlists, bandNames: file.bandNames, moodboard };
+  return { songs, pdfs, setlists: file.setlists, bandNames: file.bandNames, moodboard, rehearsals: file.rehearsals };
 }
 
 /** Befüllt eine neue, leere Datenbank mit den deutschen Start-Daten. */
@@ -132,11 +149,13 @@ async function seedDatabase(tx: Transaction): Promise<void> {
   await tx.table('setlists').bulkAdd(records.setlists);
   await tx.table('bandNames').bulkAdd(records.bandNames);
   await tx.table('moodboard').bulkAdd(records.moodboard);
+  await tx.table('rehearsals').bulkAdd(records.rehearsals);
   await tx.table('personalNotes').bulkAdd(SEED_PERSONAL_NOTES);
   const meta: MetaEntry[] = [
     { key: 'bandDataUpdatedAt', value: SEED_BAND_DATA.lastUpdated },
     { key: 'hasLocalChanges', value: false },
     { key: 'lastSyncSource', value: 'Start-Daten' },
+    { key: 'brainstormText', value: SEED_BAND_DATA.brainstormText },
   ];
   await tx.table('meta').bulkPut(meta);
 }
@@ -147,6 +166,7 @@ class BandDatabase extends Dexie {
   bandNames!: Table<BandName, string>;
   moodboard!: Table<MoodboardItem, string>;
   pdfs!: Table<SongPdf, string>;
+  rehearsals!: Table<Rehearsal, string>;
   personalNotes!: Table<PersonalNote, string>;
   meta!: Table<MetaEntry, MetaKey>;
 
@@ -161,6 +181,8 @@ class BandDatabase extends Dexie {
       personalNotes: 'id, songId, updatedAt',
       meta: 'key',
     });
+    // Version 2: Probenkalender. Bestehende Daten bleiben unverändert.
+    this.version(2).stores({ rehearsals: 'id, date' });
     // „populate“ läuft genau einmal beim Anlegen der Datenbank. Löscht der Admin später
     // alle Songs, kommen die Beispieldaten also nicht zurück.
     this.on('populate', (tx) => seedDatabase(tx));
@@ -171,7 +193,7 @@ export const db = new BandDatabase();
 
 /** Alle Tabellen, die zum geteilten Band-Stand gehören. `personalNotes` fehlt hier absichtlich. */
 function bandTables() {
-  return [db.songs, db.pdfs, db.setlists, db.bandNames, db.moodboard, db.meta];
+  return [db.songs, db.pdfs, db.setlists, db.bandNames, db.moodboard, db.rehearsals, db.meta];
 }
 
 /** Führt eine Admin-Änderung atomar aus und merkt sich, dass sie noch nicht exportiert wurde. */
@@ -339,6 +361,36 @@ function parseMoodboardItem(raw: unknown, index: number): MoodboardFile {
   };
 }
 
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function isValidDate(value: string): boolean {
+  if (!DATE_PATTERN.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
+}
+
+export function isValidTime(value: string): boolean {
+  return TIME_PATTERN.test(value);
+}
+
+function parseRehearsal(raw: unknown, index: number): Rehearsal {
+  const context = `Probentermin ${index + 1}`;
+  if (!isRecord(raw)) throw new BandDataError(`${context}: Eintrag ist ungültig.`);
+  const date = requireString(raw, 'date', context);
+  if (!isValidDate(date)) throw new BandDataError(`${context}: Das Datum „${date}“ entspricht nicht dem Format JJJJ-MM-TT.`);
+  const time = optionalString(raw, 'time', context);
+  if (time !== '' && !isValidTime(time)) throw new BandDataError(`${context}: Die Uhrzeit „${time}“ entspricht nicht dem Format HH:MM.`);
+  return {
+    id: requireString(raw, 'id', context),
+    date,
+    time,
+    title: optionalString(raw, 'title', context),
+    location: optionalString(raw, 'location', context),
+    note: optionalString(raw, 'note', context),
+  };
+}
+
 /** Prüft eine geladene Datei vollständig, bevor irgendetwas in die Datenbank geschrieben wird. */
 export function parseBandData(raw: unknown): BandDataFile {
   if (!isRecord(raw)) throw new BandDataError('Die Datei enthält keine Band-Daten.');
@@ -367,8 +419,25 @@ export function parseBandData(raw: unknown): BandDataFile {
   assertUniqueIds(bandNames, 'Bandnamen');
   const moodboard = requireArray(raw, 'moodboard').map(parseMoodboardItem);
   assertUniqueIds(moodboard, 'Moodboard');
+  // Probentermine und Freitext gibt es erst seit Herbst 2026; ältere Dateien bleiben gültig.
+  if (raw.rehearsals !== undefined && !Array.isArray(raw.rehearsals)) {
+    throw new BandDataError('Die Angabe „rehearsals“ muss eine Liste sein.');
+  }
+  const rehearsals = ((raw.rehearsals as unknown[] | undefined) ?? []).map(parseRehearsal);
+  assertUniqueIds(rehearsals, 'Probentermine');
+  const brainstormText = optionalString(raw, 'brainstormText', 'Datei');
 
-  return { format: BAND_DATA_FORMAT, schemaVersion: BAND_DATA_VERSION, lastUpdated, songs, setlists, bandNames, moodboard };
+  return {
+    format: BAND_DATA_FORMAT,
+    schemaVersion: BAND_DATA_VERSION,
+    lastUpdated,
+    songs,
+    setlists,
+    bandNames,
+    moodboard,
+    rehearsals,
+    brainstormText,
+  };
 }
 
 export function parseBandDataText(text: string): BandDataFile {
@@ -388,12 +457,14 @@ export function parseBandDataText(text: string): BandDataFile {
 /** Liest alle Band-Tabellen und verpackt sie samt Base64-Dateien. Persönliche Notizen bleiben außen vor. */
 export async function buildBandDataFile(): Promise<BandDataFile> {
   return db.transaction('r', bandTables(), async () => {
-    const [songs, pdfs, setlists, bandNames, moodboard, status] = await Promise.all([
+    const [songs, pdfs, setlists, bandNames, moodboard, rehearsals, textEntry, status] = await Promise.all([
       db.songs.toArray(),
       db.pdfs.toArray(),
       db.setlists.toArray(),
       db.bandNames.toArray(),
       db.moodboard.toArray(),
+      db.rehearsals.orderBy('date').toArray(),
+      db.meta.get('brainstormText'),
       getBandStatus(),
     ]);
     const pdfBySong = new Map(pdfs.map((pdf) => [pdf.songId, pdf]));
@@ -410,6 +481,8 @@ export async function buildBandDataFile(): Promise<BandDataFile> {
       setlists,
       bandNames,
       moodboard: moodboard.map(({ data, ...item }) => ({ ...item, base64: arrayBufferToBase64(data) })),
+      rehearsals,
+      brainstormText: typeof textEntry?.value === 'string' ? textEntry.value : '',
     };
   });
 }
@@ -453,13 +526,22 @@ export async function assessImport(file: BandDataFile): Promise<ImportAssessment
 export async function applyBandData(file: BandDataFile, source: string): Promise<void> {
   const records = toTableRecords(file);
   await db.transaction('rw', bandTables(), async () => {
-    await Promise.all([db.songs.clear(), db.pdfs.clear(), db.setlists.clear(), db.bandNames.clear(), db.moodboard.clear()]);
+    await Promise.all([
+      db.songs.clear(),
+      db.pdfs.clear(),
+      db.setlists.clear(),
+      db.bandNames.clear(),
+      db.moodboard.clear(),
+      db.rehearsals.clear(),
+    ]);
     await db.songs.bulkAdd(records.songs);
     await db.pdfs.bulkAdd(records.pdfs);
     await db.setlists.bulkAdd(records.setlists);
     await db.bandNames.bulkAdd(records.bandNames);
     await db.moodboard.bulkAdd(records.moodboard);
+    await db.rehearsals.bulkAdd(records.rehearsals);
     await db.meta.bulkPut([
+      { key: 'brainstormText', value: file.brainstormText },
       { key: 'bandDataUpdatedAt', value: file.lastUpdated },
       { key: 'hasLocalChanges', value: false },
       { key: 'lastSyncedAt', value: new Date().toISOString() },
