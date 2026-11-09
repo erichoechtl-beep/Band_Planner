@@ -86,7 +86,7 @@ export function PdfViewer({ songId, title, onClose }: PdfViewerProps) {
           canvas.height = Math.floor(viewport.height);
           canvas.style.width = `${Math.floor(viewport.width / pixelRatio)}px`;
           canvas.style.height = `${Math.floor(viewport.height / pixelRatio)}px`;
-          canvas.className = 'mx-auto block bg-white';
+          canvas.className = 'mx-auto block rounded-sm bg-white shadow-pop';
           canvas.setAttribute('aria-label', `${title}, Seite ${number}`);
           await page.render({ canvas, viewport }).promise;
           if (cancelled) return;

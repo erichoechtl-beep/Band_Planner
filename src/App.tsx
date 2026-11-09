@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BandBrainstorm } from './components/BandBrainstorm';
 import { DataSync } from './components/DataSync';
-import { Header, TABS, type TabId } from './components/Header';
+import { BottomNav, Header, TABS, type TabId } from './components/Header';
 import { PersonalNotes } from './components/PersonalNotes';
 import { SetlistBuilder } from './components/SetlistBuilder';
 import { SongManager } from './components/SongManager';
@@ -67,15 +67,17 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen pb-safe">
+    <div className="min-h-screen">
       <Header activeTab={lastTab} onSelectTab={selectTab} />
-      <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4">
+      {/* Unten Platz für die Navigationsleiste auf Handy und Tablet */}
+      <main className="mx-auto max-w-6xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:pt-8 lg:pb-12">
         {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} />}
         {route.tab === 'songs' && <SongManager />}
         {route.tab === 'brainstorming' && <BandBrainstorm />}
         {route.tab === 'notizen' && <PersonalNotes />}
         {route.tab === 'sync' && <DataSync />}
       </main>
+      <BottomNav activeTab={lastTab} onSelectTab={selectTab} />
     </div>
   );
 }

@@ -18,7 +18,7 @@ import {
 } from '../db/schema';
 import { downloadBlob, formatBytes } from '../lib/files';
 import { formatDateTime } from '../lib/time';
-import { Button, SectionTitle } from './ui';
+import { Button, InfoNote, PageHeader } from './ui';
 
 type Busy = 'export' | 'share' | 'server' | 'file' | null;
 
@@ -34,15 +34,40 @@ function summarize(file: BandDataFile): string {
   return `${file.songs.length} Songs, ${file.setlists.length} Setlists, ${file.bandNames.length} Bandnamen, ${file.moodboard.length} Bilder`;
 }
 
-function SyncCard({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
+interface SyncRowProps {
+  icon: LucideIcon;
+  tone: 'green' | 'cyan' | 'neutral';
+  title: string;
+  description: string;
+  actions: ReactNode;
+  hint?: ReactNode;
+}
+
+function SyncRow({ icon: Icon, tone, title, description, actions, hint }: SyncRowProps) {
+  const tile = tone === 'green' ? 'bg-neon/10 text-neon' : tone === 'cyan' ? 'bg-signal/10 text-signal' : 'bg-stage-raised text-stage-muted';
   return (
-    <article className="card flex flex-col gap-3 p-4">
-      <h3 className="flex items-start gap-2 text-lg font-bold">
-        <Icon className="mt-0.5 h-6 w-6 shrink-0 text-signal" aria-hidden />
-        {title}
-      </h3>
-      {children}
+    <article className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+      <div className="flex min-w-0 flex-1 items-start gap-4">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tile}`}>
+          <Icon className="h-5 w-5" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <h3 className="font-semibold leading-snug">{title}</h3>
+          <p className="mt-1 text-sm text-stage-muted">{description}</p>
+          {hint}
+        </div>
+      </div>
+      <div className="flex shrink-0 flex-col gap-2 sm:w-56">{actions}</div>
     </article>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="eyebrow">{label}</dt>
+      <dd className="mt-1 truncate text-[15px] font-semibold">{value}</dd>
+    </div>
   );
 }
 
@@ -156,94 +181,94 @@ export function DataSync() {
   };
 
   const ResultIcon = result?.tone === 'success' ? CheckCircle2 : result?.tone === 'error' ? XCircle : AlertTriangle;
-  const resultColor = result?.tone === 'success' ? 'border-neon text-neon' : result?.tone === 'error' ? 'border-danger text-danger' : 'border-signal text-signal';
+  const resultColor = result?.tone === 'success' ? 'text-neon' : result?.tone === 'error' ? 'text-danger' : 'text-signal';
+  const resultBorder = result?.tone === 'success' ? 'border-neon/40' : result?.tone === 'error' ? 'border-danger/50' : 'border-signal/40';
 
   return (
     <section>
-      <SectionTitle>Daten-Sync</SectionTitle>
+      <PageHeader title="Daten-Sync" description="Den aktuellen Band-Stand laden, importieren oder als Admin verteilen." />
 
-      <div className="card mb-4 grid gap-x-6 gap-y-1 p-4 text-sm sm:grid-cols-2">
-        <p>
-          <span className="text-stage-muted">Band-Stand auf diesem Gerät: </span>
-          <strong>{formatDateTime(status?.bandDataUpdatedAt)}</strong>
-        </p>
-        <p>
-          <span className="text-stage-muted">Quelle: </span>
-          <strong>{status?.lastSyncSource ?? 'Lokal bearbeitet'}</strong>
-        </p>
-        <p>
-          <span className="text-stage-muted">Inhalt: </span>
-          <strong>
-            {counts?.songs ?? 0} Songs, {counts?.setlists ?? 0} Setlists
-          </strong>
-        </p>
-        <p>
-          <span className="text-stage-muted">Persönliche Notizen: </span>
-          <strong>{counts?.notes ?? 0}</strong>
-        </p>
+      <div className="card mb-4 p-4 sm:p-5">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
+          <Fact label="Band-Stand" value={formatDateTime(status?.bandDataUpdatedAt)} />
+          <Fact label="Quelle" value={status?.lastSyncSource ?? 'Lokal bearbeitet'} />
+          <Fact label="Inhalt" value={`${counts?.songs ?? 0} Songs · ${counts?.setlists ?? 0} Setlists`} />
+          <Fact label="Persönliche Notizen" value={counts?.notes ?? 0} />
+        </dl>
         {status?.hasLocalChanges && (
-          <p className="mt-2 flex items-start gap-2 font-semibold text-warn sm:col-span-2">
-            <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-warn/10 px-3 py-2.5 text-sm font-medium text-warn">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             Dieses Gerät hat Änderungen, die noch nicht exportiert wurden.
           </p>
         )}
       </div>
 
-      <p className="mb-4 flex items-start gap-2 rounded-lg border border-neon/40 bg-neon/10 p-3 text-sm">
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-neon" aria-hidden />
-        Sync und Import ersetzen nur die Band-Daten. Deine persönlichen Notizen bleiben immer unangetastet.
-      </p>
-
       {result && (
-        <p role={result.tone === 'error' ? 'alert' : 'status'} className={`mb-4 flex items-start gap-2 rounded-lg border bg-stage-surface p-3 font-medium ${resultColor}`}>
-          <ResultIcon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
-          <span className="text-stage-text">{result.message}</span>
+        <p role={result.tone === 'error' ? 'alert' : 'status'} className={`mb-4 flex items-start gap-3 rounded-xl border bg-stage-surface px-4 py-3 text-[15px] ${resultBorder}`}>
+          <ResultIcon className={`mt-0.5 h-5 w-5 shrink-0 ${resultColor}`} aria-hidden />
+          <span>{result.message}</span>
         </p>
       )}
 
-      <div className="flex flex-col gap-3">
-        <SyncCard icon={CloudDownload} title="Aktuellen Band-Stand vom Server laden (GitHub-Sync)">
-          <p className="text-sm text-stage-muted">Lädt die vom Admin veröffentlichte band-data.json und aktualisiert dieses Gerät mit einem Klick.</p>
-          <Button variant="primary" icon={busy === 'server' ? Loader2 : CloudDownload} disabled={busy !== null} onClick={syncFromServer}>
-            {busy === 'server' ? 'Wird geladen …' : 'Band-Stand laden'}
-          </Button>
-          {!isOnline && <p className="text-sm font-medium text-warn">Du bist offline – für den Server-Sync wird eine Internetverbindung benötigt.</p>}
-        </SyncCard>
+      <div className="card mb-4 divide-y divide-stage-line">
+        <SyncRow
+          icon={CloudDownload}
+          tone="green"
+          title="Aktuellen Band-Stand vom Server laden (GitHub-Sync)"
+          description="Lädt die vom Admin veröffentlichte band-data.json und aktualisiert dieses Gerät mit einem Klick."
+          hint={!isOnline && <p className="mt-2 text-sm font-medium text-warn">Du bist offline – für den Server-Sync wird eine Internetverbindung benötigt.</p>}
+          actions={
+            <Button variant="primary" icon={busy === 'server' ? Loader2 : CloudDownload} disabled={busy !== null} onClick={syncFromServer}>
+              {busy === 'server' ? 'Wird geladen …' : 'Band-Stand laden'}
+            </Button>
+          }
+        />
 
-        <SyncCard icon={FileUp} title="Band-Daten aus Datei importieren (JSON)">
-          <p className="text-sm text-stage-muted">Für eine per WhatsApp oder AirDrop empfangene band-data.json. Funktioniert auch offline.</p>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="application/json,.json"
-            className="sr-only"
-            aria-label="JSON-Datei auswählen"
-            onChange={(event) => importFile(event.target.files?.[0])}
-          />
-          <Button variant="accent" icon={busy === 'file' ? Loader2 : FileUp} disabled={busy !== null} onClick={() => fileInput.current?.click()}>
-            {busy === 'file' ? 'Wird importiert …' : 'Datei auswählen'}
-          </Button>
-        </SyncCard>
+        <SyncRow
+          icon={FileUp}
+          tone="cyan"
+          title="Band-Daten aus Datei importieren (JSON)"
+          description="Für eine per WhatsApp oder AirDrop empfangene band-data.json. Funktioniert auch offline."
+          actions={
+            <>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                aria-label="JSON-Datei auswählen"
+                onChange={(event) => importFile(event.target.files?.[0])}
+              />
+              <Button icon={busy === 'file' ? Loader2 : FileUp} disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+                {busy === 'file' ? 'Wird importiert …' : 'Datei auswählen'}
+              </Button>
+            </>
+          }
+        />
 
         {isAdmin && (
-          <SyncCard icon={Download} title="Band-Daten exportieren (band-data.json)">
-            <p className="text-sm text-stage-muted">
-              Enthält Songs, Setlists, Bandnamen und Moodboard inklusive aller PDFs und Bilder. Lege die Datei in den public/-Ordner des Repos oder
-              teile sie direkt mit der Band.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="primary" icon={busy === 'export' ? Loader2 : Download} disabled={busy !== null} onClick={() => exportData('download')} className="flex-1">
-                Band-Daten exportieren
-              </Button>
-              {canShareFiles && (
-                <Button icon={busy === 'share' ? Loader2 : Share2} disabled={busy !== null} onClick={() => exportData('share')} className="flex-1">
-                  Teilen (z. B. WhatsApp)
+          <SyncRow
+            icon={Download}
+            tone="neutral"
+            title="Band-Daten exportieren (band-data.json)"
+            description="Enthält Songs, Setlists, Bandnamen und Moodboard inklusive aller PDFs und Bilder. Lege die Datei in den public/-Ordner des Repos oder teile sie direkt mit der Band."
+            actions={
+              <>
+                <Button variant="accent" icon={busy === 'export' ? Loader2 : Download} disabled={busy !== null} onClick={() => exportData('download')}>
+                  Band-Daten exportieren
                 </Button>
-              )}
-            </div>
-          </SyncCard>
+                {canShareFiles && (
+                  <Button icon={busy === 'share' ? Loader2 : Share2} disabled={busy !== null} onClick={() => exportData('share')}>
+                    Teilen (z. B. WhatsApp)
+                  </Button>
+                )}
+              </>
+            }
+          />
         )}
       </div>
+
+      <InfoNote icon={ShieldCheck}>Sync und Import ersetzen nur die Band-Daten. Deine persönlichen Notizen bleiben immer unangetastet.</InfoNote>
     </section>
   );
 }

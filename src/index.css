@@ -1,3 +1,5 @@
+@import './fonts.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -16,13 +18,14 @@
   }
 
   body {
-    @apply bg-stage-bg text-stage-text font-sans antialiased;
+    @apply bg-stage-bg font-sans text-stage-text antialiased;
+    /* Inter: ruhigere Ziffern und eindeutiges l/I */
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
     overscroll-behavior-y: none;
   }
 
-  /* Klar sichtbarer Fokus für Tastatur und Fußpedale */
   :focus-visible {
-    outline: 3px solid #06b6d4;
+    outline: 2px solid #06b6d4;
     outline-offset: 2px;
   }
 
@@ -32,19 +35,27 @@
     /* Unter 16 px zoomt iOS beim Antippen ungewollt in die Seite */
     font-size: 16px;
   }
+
+  ::selection {
+    background: rgba(34, 197, 94, 0.35);
+  }
 }
 
 @layer components {
   .field {
-    @apply min-h-touch w-full rounded-lg border border-stage-line bg-stage-bg px-3 py-2 text-stage-text placeholder:text-stage-muted/70 focus:border-signal focus:outline-none;
+    @apply min-h-touch w-full rounded-lg border border-stage-line bg-stage-bg px-3 py-2 text-stage-text transition-colors placeholder:text-stage-subtle hover:border-stage-strong focus:border-signal focus:outline-none;
   }
 
   .field-label {
-    @apply mb-1 block text-sm font-semibold text-stage-muted;
+    @apply mb-1.5 block text-sm font-medium text-stage-muted;
   }
 
   .card {
-    @apply rounded-xl border border-stage-line bg-stage-surface;
+    @apply rounded-xl border border-stage-line bg-stage-surface shadow-panel;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-stage-subtle;
   }
 }
 

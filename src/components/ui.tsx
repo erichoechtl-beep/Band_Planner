@@ -1,13 +1,15 @@
-import { X, type LucideIcon } from 'lucide-react';
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { ChevronRight, X, type LucideIcon } from 'lucide-react';
+import { Fragment, useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
-type ButtonVariant = 'primary' | 'accent' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'destructive';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary: 'bg-neon text-stage-bg hover:bg-neon-strong font-bold',
-  accent: 'bg-signal text-stage-bg hover:brightness-110 font-bold',
-  ghost: 'border border-stage-line bg-stage-raised text-stage-text hover:border-signal font-semibold',
-  danger: 'border border-danger bg-transparent text-danger hover:bg-danger hover:text-stage-bg font-semibold',
+  destructive: 'bg-danger text-stage-bg font-semibold hover:brightness-110',
+  primary: 'bg-neon text-stage-bg font-semibold hover:bg-[#2fd36b] active:bg-neon-strong',
+  accent: 'bg-signal text-stage-bg font-semibold hover:brightness-110',
+  secondary: 'border border-stage-line bg-stage-raised text-stage-text font-medium hover:border-stage-strong hover:bg-stage-hover',
+  ghost: 'text-stage-muted font-medium hover:bg-stage-raised hover:text-stage-text',
+  danger: 'text-danger font-medium hover:bg-danger/10',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,14 +17,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: LucideIcon;
 }
 
-export function Button({ variant = 'ghost', icon: Icon, className = '', children, type = 'button', ...rest }: ButtonProps) {
+export function Button({ variant = 'secondary', icon: Icon, className = '', children, type = 'button', ...rest }: ButtonProps) {
   return (
     <button
       type={type}
-      className={`inline-flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-lg px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${className}`}
+      className={`inline-flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-lg px-4 py-2 text-[15px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${VARIANT_CLASSES[variant]} ${className}`}
       {...rest}
     >
-      {Icon && <Icon className="h-5 w-5 shrink-0" aria-hidden />}
+      {Icon && <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2.25} aria-hidden />}
       {children}
     </button>
   );
@@ -41,33 +43,75 @@ export function IconButton({ icon: Icon, label, variant = 'ghost', className = '
       type={type}
       aria-label={label}
       title={label}
-      className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${className}`}
+      className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${VARIANT_CLASSES[variant]} ${className}`}
       {...rest}
     >
-      <Icon className="h-5 w-5" aria-hidden />
+      <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
     </button>
   );
 }
 
-type BadgeTone = 'green' | 'cyan' | 'neutral';
+type BadgeTone = 'green' | 'cyan' | 'amber' | 'neutral';
 
 const BADGE_TONES: Record<BadgeTone, string> = {
-  green: 'border-neon/60 text-neon',
-  cyan: 'border-signal/60 text-signal',
-  neutral: 'border-stage-line text-stage-text',
+  green: 'bg-neon/10 text-neon',
+  cyan: 'bg-signal/10 text-signal',
+  amber: 'bg-warn/10 text-warn',
+  neutral: 'bg-white/[0.06] text-stage-muted',
 };
 
-export function Badge({ tone = 'neutral', label, children }: { tone?: BadgeTone; label?: string; children: ReactNode }) {
+export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; children: ReactNode }) {
   return (
-    <span className={`inline-flex shrink-0 items-baseline gap-1.5 whitespace-nowrap rounded-md border bg-stage-bg px-2 py-0.5 text-sm font-semibold ${BADGE_TONES[tone]}`}>
-      {label && <span className="text-xs font-medium text-stage-muted">{label}</span>}
+    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums ${BADGE_TONES[tone]}`}>
       {children}
     </span>
   );
 }
 
+/** Kennzahl mit kleiner Beschriftung, z. B. Tonart oder Tempo. */
+export function Stat({ label, value, tone = 'neutral', size = 'md' }: { label: string; value: string; tone?: 'green' | 'cyan' | 'amber' | 'neutral'; size?: 'md' | 'xl' }) {
+  const color = tone === 'green' ? 'text-neon' : tone === 'cyan' ? 'text-signal' : tone === 'amber' ? 'text-warn' : 'text-stage-text';
+  return (
+    <div className={`rounded-xl border border-stage-line bg-stage-surface ${size === 'xl' ? 'px-4 py-2.5 sm:px-5 sm:py-3' : 'px-3 py-2'}`}>
+      <div className="eyebrow">{label}</div>
+      <div className={`font-bold tabular-nums leading-tight tracking-tight ${color} ${size === 'xl' ? 'text-2xl sm:text-4xl' : 'text-lg'}`}>{value}</div>
+    </div>
+  );
+}
+
+/** Zeigt den Song-Ablauf als Abfolge von Teilen. Akkorde in Klammern werden hervorgehoben. */
+export function StructureFlow({ structure, size = 'md' }: { structure: string; size?: 'md' | 'xl' }) {
+  const parts = structure
+    .split(/\s*(?:→|->|>|›)\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const pill = size === 'xl' ? 'px-2.5 py-1 text-lg sm:px-3 sm:py-1.5 sm:text-2xl' : 'px-2.5 py-1 text-sm';
+  return (
+    <ol className="flex flex-wrap items-center gap-x-1 gap-y-1.5" aria-label={`Song-Ablauf: ${structure}`}>
+      {parts.map((part, index) => {
+        const match = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(part);
+        return (
+          <Fragment key={`${part}-${index}`}>
+            {index > 0 && <ChevronRight className={`shrink-0 text-stage-subtle ${size === 'xl' ? 'h-5 w-5' : 'h-4 w-4'}`} aria-hidden />}
+            <li className={`rounded-md border border-stage-line bg-stage-raised font-semibold ${pill}`}>
+              {match ? (
+                <>
+                  {match[1]} <span className="font-mono font-bold text-signal">{match[2]}</span>
+                </>
+              ) : (
+                part
+              )}
+            </li>
+          </Fragment>
+        );
+      })}
+    </ol>
+  );
+}
+
 interface ModalProps {
   title: string;
+  subtitle?: string;
   onClose: () => void;
   children: ReactNode;
   size?: 'sm' | 'lg' | 'full';
@@ -77,12 +121,12 @@ interface ModalProps {
 }
 
 const MODAL_SIZES = {
-  sm: 'sm:max-w-md sm:rounded-xl sm:border sm:h-auto sm:max-h-[85vh]',
-  lg: 'sm:max-w-2xl sm:rounded-xl sm:border sm:h-auto sm:max-h-[90vh]',
+  sm: 'sm:max-w-md sm:rounded-2xl sm:border sm:h-auto sm:max-h-[85vh] sm:shadow-pop',
+  lg: 'sm:max-w-2xl sm:rounded-2xl sm:border sm:h-auto sm:max-h-[90vh] sm:shadow-pop',
   full: '',
 };
 
-export function Modal({ title, onClose, children, size = 'lg', layer = 'default', headerExtra }: ModalProps) {
+export function Modal({ title, subtitle, onClose, children, size = 'lg', layer = 'default', headerExtra }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +154,7 @@ export function Modal({ title, onClose, children, size = 'lg', layer = 'default'
 
   return (
     <div
-      className={`fixed inset-0 flex items-stretch justify-center bg-black/70 sm:items-center sm:p-4 ${layer === 'top' ? 'z-[60]' : 'z-50'}`}
+      className={`fixed inset-0 flex items-stretch justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4 ${layer === 'top' ? 'z-[60]' : 'z-50'}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -121,12 +165,15 @@ export function Modal({ title, onClose, children, size = 'lg', layer = 'default'
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`flex h-full w-full flex-col border-stage-line bg-stage-surface outline-none pt-safe pb-safe ${MODAL_SIZES[size]}`}
+        className={`flex h-full w-full flex-col overflow-hidden border-stage-line bg-stage-surface outline-none pt-safe pb-safe ${MODAL_SIZES[size]}`}
       >
-        <header className="flex shrink-0 items-center gap-2 border-b border-stage-line px-4 py-2">
-          <h2 id={titleId} className="min-w-0 flex-1 truncate text-lg font-bold">
-            {title}
-          </h2>
+        <header className="flex shrink-0 items-center gap-2 border-b border-stage-line py-2 pl-5 pr-2">
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="truncate text-base font-semibold sm:text-lg">
+              {title}
+            </h2>
+            {subtitle && <p className="truncate text-sm text-stage-muted">{subtitle}</p>}
+          </div>
           {headerExtra}
           <IconButton icon={X} label="Schließen" onClick={onClose} />
         </header>
@@ -138,10 +185,24 @@ export function Modal({ title, onClose, children, size = 'lg', layer = 'default'
 
 export function EmptyState({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-stage-line px-6 py-10 text-center">
-      <Icon className="h-10 w-10 text-stage-muted" aria-hidden />
-      <p className="text-lg font-semibold">{title}</p>
-      {children && <div className="max-w-md text-stage-muted">{children}</div>}
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-stage-line px-6 py-12 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-stage-raised">
+        <Icon className="h-6 w-6 text-stage-muted" aria-hidden />
+      </span>
+      <p className="font-semibold">{title}</p>
+      {children && <div className="max-w-sm text-sm text-stage-muted">{children}</div>}
+    </div>
+  );
+}
+
+export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0">
+        <h2 className="text-2xl font-bold tracking-tight sm:text-[28px]">{title}</h2>
+        {description && <p className="mt-1 text-[15px] text-stage-muted">{description}</p>}
+      </div>
+      {action && <div className="flex shrink-0 flex-wrap gap-2">{action}</div>}
     </div>
   );
 }
@@ -149,8 +210,18 @@ export function EmptyState({ icon: Icon, title, children }: { icon: LucideIcon; 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-2xl font-bold">{children}</h2>
+      <h3 className="text-lg font-semibold tracking-tight">{children}</h3>
       {action}
     </div>
+  );
+}
+
+export function InfoNote({ icon: Icon, children, tone = 'green' }: { icon: LucideIcon; children: ReactNode; tone?: 'green' | 'amber' }) {
+  const color = tone === 'green' ? 'text-neon' : 'text-warn';
+  return (
+    <p className="flex items-start gap-3 rounded-xl border border-stage-line bg-stage-surface px-4 py-3 text-sm text-stage-muted">
+      <Icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${color}`} aria-hidden />
+      <span>{children}</span>
+    </p>
   );
 }

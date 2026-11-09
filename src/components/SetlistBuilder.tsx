@@ -17,33 +17,106 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check, Clock, GripVertical, ListMusic, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Check, GripVertical, ListMusic, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
 import { createSetlist, deleteSetlist, renameSetlist, setSetlistSongs } from '../db/bandActions';
 import { db, describeError, type Setlist, type Song } from '../db/schema';
 import { formatTotalDuration, sumDurations } from '../lib/time';
-import { Badge, Button, EmptyState, IconButton, Modal, SectionTitle } from './ui';
+import { Badge, Button, EmptyState, IconButton, InfoNote, Modal, PageHeader } from './ui';
+
+const STANDARD_TUNING = 'Standard E';
 
 function resolveSongs(setlist: Setlist, songsById: Map<string, Song>): Song[] {
   return setlist.songIds.flatMap((id) => songsById.get(id) ?? []);
 }
 
-function DurationSummary({ songs }: { songs: Song[] }) {
+function countTuningChanges(songs: Song[]): number {
+  let changes = 0;
+  for (let i = 1; i < songs.length; i++) {
+    if ((songs[i].tuning || STANDARD_TUNING) !== (songs[i - 1].tuning || STANDARD_TUNING)) changes += 1;
+  }
+  return changes;
+}
+
+function SetlistMeta({ songs, compact = false }: { songs: Song[]; compact?: boolean }) {
   const { seconds, missing } = sumDurations(songs.map((song) => song.duration));
+  const changes = countTuningChanges(songs);
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-2 text-sm text-stage-muted">
-      <span className="inline-flex items-center gap-1 font-semibold text-neon">
-        <Clock className="h-4 w-4" aria-hidden />
-        {formatTotalDuration(seconds)}
-      </span>
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-stage-muted">
+      <span className="font-semibold tabular-nums text-neon">{formatTotalDuration(seconds)}</span>
+      <span aria-hidden>·</span>
       <span>
-        · {songs.length} {songs.length === 1 ? 'Song' : 'Songs'}
+        {songs.length} {songs.length === 1 ? 'Song' : 'Songs'}
       </span>
-      {missing > 0 && <span className="text-warn">· {missing} ohne Dauer</span>}
+      {!compact && changes > 0 && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="text-warn">
+            {changes} {changes === 1 ? 'Umstimmung' : 'Umstimmungen'}
+          </span>
+        </>
+      )}
+      {missing > 0 && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="text-warn">{missing} ohne Dauer</span>
+        </>
+      )}
     </span>
   );
+}
+
+/** Spalten der Song-Liste: auf breiten Bildschirmen tabellarisch, auf dem Handy unter dem Titel. */
+function SongColumns({ song }: { song: Song }) {
+  const tuning = song.tuning && song.tuning !== STANDARD_TUNING ? song.tuning : '';
+  return (
+    <>
+      <span className="hidden w-14 font-mono text-sm font-semibold text-neon sm:block">{song.key || '–'}</span>
+      <span className="hidden w-16 text-sm tabular-nums text-signal sm:block">{song.bpm ?? '–'}</span>
+      <span className="hidden w-28 truncate text-sm font-medium text-warn md:block">{tuning}</span>
+      <span className="hidden w-12 text-right text-sm tabular-nums text-stage-muted sm:block">{song.duration || '–'}</span>
+    </>
+  );
+}
+
+function SongTitleCell({ song, position }: { song: Song; position: number }) {
+  const tuning = song.tuning && song.tuning !== STANDARD_TUNING ? song.tuning : '';
+  return (
+    <>
+      <span className="w-7 shrink-0 text-center text-sm font-semibold tabular-nums text-stage-subtle">{String(position).padStart(2, '0')}</span>
+      <span className="min-w-0 flex-1 py-2">
+        <span className="block truncate font-medium">{song.title}</span>
+        <span className="mt-0.5 flex flex-wrap gap-1.5 sm:hidden">
+          {song.key && <Badge tone="green">{song.key}</Badge>}
+          {song.bpm !== null && <Badge tone="cyan">{song.bpm} BPM</Badge>}
+          {tuning && <Badge tone="amber">{tuning}</Badge>}
+          {song.duration && <Badge>{song.duration}</Badge>}
+        </span>
+        {tuning && <span className="mt-0.5 hidden truncate text-xs font-medium text-warn sm:block md:hidden">{tuning}</span>}
+      </span>
+    </>
+  );
+}
+
+function ListHead({ withHandle }: { withHandle: boolean }) {
+  return (
+    <div className="eyebrow hidden items-center gap-2 px-2 pb-2 sm:flex" aria-hidden>
+      {withHandle && <span className="w-12" />}
+      <span className="w-7 text-center">#</span>
+      <span className="flex-1">Titel</span>
+      <span className="w-14">Tonart</span>
+      <span className="w-16">BPM</span>
+      <span className="hidden w-28 md:block">Stimmung</span>
+      <span className="w-12 text-right">Dauer</span>
+      {withHandle && <span className="w-12" />}
+    </div>
+  );
+}
+
+function Row({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`flex min-h-touch items-center gap-2 px-2 ${className}`}>{children}</div>;
 }
 
 function SortableSongRow({ song, position, onRemove }: { song: Song; position: number; onRemove: () => void }) {
@@ -51,40 +124,27 @@ function SortableSongRow({ song, position, onRemove }: { song: Song; position: n
   return (
     <li
       ref={setNodeRef}
+      data-setlist-row={song.title}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`flex items-center gap-2 rounded-lg border bg-stage-raised p-1 pr-2 ${isDragging ? 'relative z-10 border-neon shadow-2xl' : 'border-stage-line'}`}
+      className={`rounded-lg border bg-stage-surface ${isDragging ? 'relative z-10 border-neon shadow-pop' : 'border-transparent hover:border-stage-line'}`}
     >
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        aria-label={`„${song.title}“ verschieben`}
-        title="Ziehen zum Sortieren"
-        className="flex h-12 w-12 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-stage-muted hover:text-stage-text active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-6 w-6" aria-hidden />
-      </button>
-      <SongRowContent song={song} position={position} />
-      <IconButton icon={X} label={`„${song.title}“ aus der Setlist entfernen`} onClick={onRemove} />
+      <Row className="pl-0 pr-0">
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          aria-label={`„${song.title}“ verschieben`}
+          title="Ziehen zum Sortieren"
+          className="flex h-12 w-12 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-stage-subtle hover:text-stage-text active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-5 w-5" aria-hidden />
+        </button>
+        <SongTitleCell song={song} position={position} />
+        <SongColumns song={song} />
+        <IconButton icon={X} label={`„${song.title}“ aus der Setlist entfernen`} onClick={onRemove} />
+      </Row>
     </li>
-  );
-}
-
-function SongRowContent({ song, position }: { song: Song; position: number }) {
-  return (
-    <>
-      <span className="w-6 shrink-0 text-center text-lg font-bold tabular-nums text-stage-muted">{position}</span>
-      <span className="min-w-0 flex-1 py-1">
-        <span className="block break-words font-semibold leading-snug">{song.title}</span>
-        <span className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-stage-muted">
-          {song.key && <span className="font-semibold text-neon">{song.key}</span>}
-          {song.bpm !== null && <span className="text-signal">{song.bpm} BPM</span>}
-          {song.tuning && song.tuning !== 'Standard E' && <span className="font-semibold text-warn">{song.tuning}</span>}
-          {song.duration && <span className="tabular-nums">{song.duration}</span>}
-        </span>
-      </span>
-    </>
   );
 }
 
@@ -106,10 +166,10 @@ function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: S
   };
 
   return (
-    <Modal title={`Songs zu „${setlist.name}“ hinzufügen`} onClose={onClose}>
-      <div className="flex flex-col gap-3 p-4">
+    <Modal title="Songs hinzufügen" subtitle={setlist.name} onClose={onClose}>
+      <div className="flex min-h-full flex-col gap-3 p-5">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-stage-muted" aria-hidden />
+          <Search className="pointer-events-none absolute left-3.5 top-3.5 h-5 w-5 text-stage-subtle" aria-hidden />
           <input
             className="field pl-11"
             type="search"
@@ -120,28 +180,36 @@ function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: S
           />
         </div>
         {candidates.length === 0 && (
-          <p className="py-6 text-center text-stage-muted">
-            {songs.length === 0 ? 'Lege zuerst im Reiter „Songs & PDFs“ einen Song an.' : 'Keine weiteren Songs verfügbar.'}
+          <p className="py-8 text-center text-sm text-stage-muted">
+            {songs.length === 0 ? 'Lege zuerst im Bereich „Songs & PDFs“ einen Song an.' : 'Keine weiteren Songs verfügbar.'}
           </p>
         )}
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-1">
           {candidates.map((song) => (
             <li key={song.id}>
               <button
                 type="button"
                 onClick={() => add(song)}
-                className="flex min-h-touch w-full items-center gap-3 rounded-lg border border-stage-line bg-stage-raised p-3 text-left hover:border-neon"
+                className="flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-stage-raised"
               >
-                <Plus className="h-5 w-5 shrink-0 text-neon" aria-hidden />
-                <span className="min-w-0 flex-1 break-words font-semibold">{song.title}</span>
-                {song.duration && <span className="text-sm tabular-nums text-stage-muted">{song.duration}</span>}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neon/10 text-neon">
+                  <Plus className="h-4 w-4" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{song.title}</span>
+                  {song.artist && <span className="block truncate text-sm text-stage-muted">{song.artist}</span>}
+                </span>
+                {song.key && <span className="font-mono text-sm text-neon">{song.key}</span>}
+                {song.duration && <span className="w-12 text-right text-sm tabular-nums text-stage-muted">{song.duration}</span>}
               </button>
             </li>
           ))}
         </ul>
-        <Button variant="primary" icon={Check} onClick={onClose} className="sticky bottom-2">
-          Fertig
-        </Button>
+        <div className="sticky bottom-0 mt-auto bg-stage-surface pt-2">
+          <Button variant="primary" icon={Check} onClick={onClose} className="w-full">
+            Fertig
+          </Button>
+        </div>
       </div>
     </Modal>
   );
@@ -216,12 +284,12 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
   };
 
   return (
-    <div className="card flex flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="card overflow-hidden">
+      <div className="flex flex-col gap-4 border-b border-stage-line p-4 sm:flex-row sm:items-center sm:p-5">
         {editingName !== null && isAdmin ? (
-          <form onSubmit={saveName} className="flex min-w-0 flex-1 basis-64 gap-2">
+          <form onSubmit={saveName} className="flex min-w-0 flex-1 gap-2">
             <input
-              className="field font-bold"
+              className="field font-semibold"
               value={editingName}
               onChange={(event) => setEditingName(event.target.value)}
               aria-label="Name der Setlist"
@@ -231,54 +299,66 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
             <IconButton icon={X} label="Abbrechen" onClick={() => setEditingName(null)} />
           </form>
         ) : (
-          <div className="min-w-0 flex-1 basis-64">
-            <h3 className="break-words text-2xl font-extrabold">{setlist.name}</h3>
-            <DurationSummary songs={songs} />
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow">Setlist</p>
+              <h3 className="break-words text-xl font-bold tracking-tight sm:text-2xl">{setlist.name}</h3>
+              <SetlistMeta songs={songs} />
+            </div>
+            {isAdmin && (
+              <div className="flex shrink-0">
+                <IconButton icon={Pencil} label="Setlist umbenennen" onClick={() => setEditingName(setlist.name)} />
+                <IconButton icon={Trash2} label="Setlist löschen" variant="danger" onClick={remove} />
+              </div>
+            )}
           </div>
         )}
-        {isAdmin && editingName === null && (
-          <div className="flex gap-2">
-            <IconButton icon={Pencil} label="Setlist umbenennen" onClick={() => setEditingName(setlist.name)} />
-            <IconButton icon={Trash2} label="Setlist löschen" variant="danger" onClick={remove} />
-          </div>
-        )}
+        <Button variant="primary" icon={Play} onClick={onStartStage} disabled={songs.length === 0} className="sm:shrink-0">
+          Bühnenansicht starten
+        </Button>
       </div>
 
-      <Button variant="primary" icon={Play} onClick={onStartStage} disabled={songs.length === 0} className="min-h-16 text-xl">
-        Vollbild-Bühnenansicht starten
-      </Button>
+      <div className="p-2 sm:p-3">
+        {songs.length === 0 ? (
+          <div className="p-2">
+            <EmptyState icon={ListMusic} title="Diese Setlist ist leer">
+              {isAdmin ? 'Füge die ersten Songs hinzu.' : 'Der Admin hat hier noch keine Songs eingetragen.'}
+            </EmptyState>
+          </div>
+        ) : (
+          <>
+            <ListHead withHandle={isAdmin} />
+            {isAdmin ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={songs.map((song) => song.id)} strategy={verticalListSortingStrategy}>
+                  <ol className="flex flex-col gap-0.5">
+                    {songs.map((song, index) => (
+                      <SortableSongRow key={song.id} song={song} position={index + 1} onRemove={() => removeSong(song.id)} />
+                    ))}
+                  </ol>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <ol className="flex flex-col divide-y divide-stage-line/60">
+                {songs.map((song, index) => (
+                  <li key={song.id} data-setlist-row={song.title}>
+                    <Row>
+                      <SongTitleCell song={song} position={index + 1} />
+                      <SongColumns song={song} />
+                    </Row>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </>
+        )}
 
-      {songs.length === 0 && (
-        <EmptyState icon={ListMusic} title="Diese Setlist ist leer">
-          {isAdmin ? 'Füge unten die ersten Songs hinzu.' : 'Der Admin hat hier noch keine Songs eingetragen.'}
-        </EmptyState>
-      )}
-
-      {isAdmin ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={songs.map((song) => song.id)} strategy={verticalListSortingStrategy}>
-            <ol className="flex flex-col gap-2">
-              {songs.map((song, index) => (
-                <SortableSongRow key={song.id} song={song} position={index + 1} onRemove={() => removeSong(song.id)} />
-              ))}
-            </ol>
-          </SortableContext>
-        </DndContext>
-      ) : (
-        <ol className="flex flex-col gap-2">
-          {songs.map((song, index) => (
-            <li key={song.id} className="flex min-h-touch items-center gap-2 rounded-lg border border-stage-line bg-stage-raised p-2">
-              <SongRowContent song={song} position={index + 1} />
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {isAdmin && (
-        <Button icon={Plus} onClick={() => setAdding(true)}>
-          Songs hinzufügen
-        </Button>
-      )}
+        {isAdmin && (
+          <Button variant="ghost" icon={Plus} onClick={() => setAdding(true)} className="mt-1 w-full justify-start text-neon hover:text-neon">
+            Songs hinzufügen
+          </Button>
+        )}
+      </div>
 
       {adding && <AddSongsModal setlist={setlist} songs={[...songsById.values()]} onClose={() => setAdding(false)} />}
     </div>
@@ -314,7 +394,9 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
 
   return (
     <section>
-      <SectionTitle
+      <PageHeader
+        title="Setlists"
+        description="Konzertabläufe planen und auf der Bühne abrufen."
         action={
           isAdmin &&
           newName === null && (
@@ -323,9 +405,7 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
             </Button>
           )
         }
-      >
-        Setlists
-      </SectionTitle>
+      />
 
       {isAdmin && newName !== null && (
         <form onSubmit={create} className="card mb-4 flex gap-2 p-3">
@@ -333,7 +413,7 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
             className="field"
             value={newName}
             onChange={(event) => setNewName(event.target.value)}
-            placeholder="z. B. Acoustic Set"
+            placeholder="Name, z. B. Acoustic Set"
             aria-label="Name der neuen Setlist"
             autoFocus
           />
@@ -344,23 +424,31 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
 
       {sorted.length === 0 ? (
         <EmptyState icon={ListMusic} title="Noch keine Setlists">
-          {isAdmin ? 'Erstelle mit „Neue Setlist“ die erste Setlist.' : 'Lade im Reiter „Daten-Sync“ den aktuellen Band-Stand.'}
+          {isAdmin ? 'Erstelle mit „Neue Setlist“ die erste Setlist.' : 'Lade im Bereich „Daten-Sync“ den aktuellen Band-Stand.'}
         </EmptyState>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
-          <ul className="flex flex-col gap-2">
+        <div className="grid items-start gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-6">
+          {/* Handy: waagerecht wischbar, ab Desktop als Seitenleiste */}
+          <ul
+            className={`no-scrollbar -mx-4 gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 ${sorted.length > 1 ? 'flex' : 'hidden'}`}
+            aria-label="Setlists"
+          >
             {sorted.map((setlist) => {
               const isActive = setlist.id === selected?.id;
               return (
-                <li key={setlist.id}>
+                <li key={setlist.id} className="shrink-0 lg:shrink">
                   <button
                     type="button"
                     aria-current={isActive ? 'true' : undefined}
                     onClick={() => setSelectedId(setlist.id)}
-                    className={`card flex min-h-touch w-full flex-col gap-1 p-3 text-left transition-colors ${isActive ? 'border-neon bg-stage-raised' : 'hover:border-signal'}`}
+                    className={`flex min-h-touch w-full flex-col justify-center rounded-lg border px-3 py-2 text-left transition-colors ${
+                      isActive ? 'border-stage-strong bg-stage-raised' : 'border-stage-line bg-stage-surface hover:bg-stage-raised lg:border-transparent lg:bg-transparent'
+                    }`}
                   >
-                    <span className="break-words text-lg font-bold leading-snug">{setlist.name}</span>
-                    <DurationSummary songs={resolveSongs(setlist, songsById)} />
+                    <span className={`block max-w-56 truncate text-sm font-semibold ${isActive ? 'text-stage-text' : 'text-stage-muted'}`}>{setlist.name}</span>
+                    <span className="hidden lg:block">
+                      <SetlistMeta songs={resolveSongs(setlist, songsById)} compact />
+                    </span>
                   </button>
                 </li>
               );
@@ -371,9 +459,11 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
       )}
 
       {!isAdmin && sorted.length > 0 && (
-        <p className="mt-4 flex items-center gap-2 text-sm text-stage-muted">
-          <Badge>Nur Lesen</Badge> Änderungen an Setlists sind im Admin-Bearbeitungsmodus möglich.
-        </p>
+        <div className="mt-6">
+          <InfoNote icon={ListMusic} tone="amber">
+            Nur Lesen – Änderungen an Setlists sind im Admin-Bearbeitungsmodus möglich.
+          </InfoNote>
+        </div>
       )}
     </section>
   );

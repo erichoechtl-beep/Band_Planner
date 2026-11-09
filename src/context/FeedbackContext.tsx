@@ -64,15 +64,19 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
 
       {pending && (
         <Modal title={pending.title} onClose={() => settle(false)} size="sm" layer="top">
-          <div className="flex gap-3 p-4">
-            {pending.danger && <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-warn" aria-hidden />}
-            <p className="whitespace-pre-line text-base leading-relaxed">{pending.message}</p>
+          <div className="flex gap-3 px-5 py-5">
+            {pending.danger && (
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warn/10">
+                <AlertTriangle className="h-5 w-5 text-warn" aria-hidden />
+              </span>
+            )}
+            <p className="whitespace-pre-line text-[15px] leading-relaxed text-stage-muted">{pending.message}</p>
           </div>
-          <div className="flex flex-col-reverse gap-2 border-t border-stage-line p-4 sm:flex-row sm:justify-end">
-            <Button variant="ghost" onClick={() => settle(false)}>
+          <div className="flex flex-col-reverse gap-2 border-t border-stage-line bg-stage-bg/40 px-5 py-4 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => settle(false)}>
               Abbrechen
             </Button>
-            <Button variant={pending.danger ? 'danger' : 'primary'} onClick={() => settle(true)}>
+            <Button variant={pending.danger ? 'destructive' : 'primary'} onClick={() => settle(true)}>
               {pending.confirmLabel}
             </Button>
           </div>
@@ -85,23 +89,21 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
           <div
             key={item.id}
             role={item.tone === 'error' ? 'alert' : 'status'}
-            className={`pointer-events-auto flex w-full max-w-lg items-start gap-3 rounded-xl border bg-stage-raised p-3 shadow-2xl ${
-              item.tone === 'error' ? 'border-danger' : 'border-neon'
-            }`}
+            className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-stage-strong bg-stage-raised py-1 pl-4 pr-1 shadow-pop"
           >
             {item.tone === 'error' ? (
-              <XCircle className="mt-3 h-5 w-5 shrink-0 text-danger" aria-hidden />
+              <XCircle className="h-5 w-5 shrink-0 text-danger" aria-hidden />
             ) : (
-              <CheckCircle2 className="mt-3 h-5 w-5 shrink-0 text-neon" aria-hidden />
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-neon" aria-hidden />
             )}
-            <p className="flex-1 py-2.5 text-sm font-medium">{item.message}</p>
+            <p className="flex-1 py-2 text-sm font-medium">{item.message}</p>
             <button
               type="button"
               onClick={() => dismiss(item.id)}
               aria-label="Meldung schließen"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-stage-muted hover:bg-stage-surface"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-stage-subtle hover:bg-stage-hover hover:text-stage-text"
             >
-              <X className="h-5 w-5" aria-hidden />
+              <X className="h-4 w-4" aria-hidden />
             </button>
           </div>
         ))}

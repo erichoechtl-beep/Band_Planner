@@ -6,7 +6,7 @@ import { useFeedback } from '../context/FeedbackContext';
 import { addBandName, addMoodboardImage, deleteBandName, deleteMoodboardImage, voteBandName } from '../db/bandActions';
 import { db, describeError, type BandName, type MoodboardItem } from '../db/schema';
 import { prepareImage } from '../lib/files';
-import { Button, EmptyState, IconButton, Modal, SectionTitle } from './ui';
+import { Button, EmptyState, IconButton, Modal, PageHeader, SectionTitle } from './ui';
 
 function useImageUrl(item: MoodboardItem): string | null {
   const [url, setUrl] = useState<string | null>(null);
@@ -18,10 +18,12 @@ function useImageUrl(item: MoodboardItem): string | null {
   return url;
 }
 
-function BandNameRow({ entry, rank }: { entry: BandName; rank: number }) {
+function BandNameRow({ entry, rank, maxVotes }: { entry: BandName; rank: number; maxVotes: number }) {
   const { isAdmin } = useAdmin();
   const { toast, confirm } = useFeedback();
   const score = entry.upvotes - entry.downvotes;
+  const total = entry.upvotes + entry.downvotes;
+  const share = maxVotes > 0 ? (entry.upvotes / maxVotes) * 100 : 0;
 
   const vote = async (direction: 'up' | 'down') => {
     try {
@@ -47,27 +49,39 @@ function BandNameRow({ entry, rank }: { entry: BandName; rank: number }) {
   };
 
   return (
-    <li className="card flex flex-wrap items-center gap-2 p-2 pl-3">
-      <span className="w-6 shrink-0 text-lg font-bold tabular-nums text-stage-muted">{rank}</span>
-      <span className="min-w-0 flex-1 basis-40 break-words py-2 text-lg font-bold">{entry.name}</span>
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap">
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums ${rank === 1 ? 'bg-neon/15 text-neon' : 'bg-stage-raised text-stage-muted'}`}>
+        {rank}
+      </span>
+      <div className="min-w-0 flex-1 basis-40">
+        <p className="truncate font-semibold">{entry.name}</p>
+        <div className="mt-1.5 flex items-center gap-2">
+          <div className="h-1.5 max-w-40 flex-1 overflow-hidden rounded-full bg-stage-raised" aria-hidden>
+            <div className="h-full rounded-full bg-neon/70" style={{ width: `${share}%` }} />
+          </div>
+          <span className="text-xs tabular-nums text-stage-subtle">
+            {total} {total === 1 ? 'Stimme' : 'Stimmen'}
+          </span>
+        </div>
+      </div>
       <span
-        className={`w-12 shrink-0 text-center text-xl font-extrabold tabular-nums ${score > 0 ? 'text-neon' : score < 0 ? 'text-danger' : 'text-stage-muted'}`}
+        className={`w-10 shrink-0 text-right text-lg font-bold tabular-nums ${score > 0 ? 'text-neon' : score < 0 ? 'text-danger' : 'text-stage-subtle'}`}
         aria-label={`Bewertung ${score}`}
       >
         {score > 0 ? `+${score}` : score}
       </span>
       {isAdmin ? (
-        <span className="flex gap-1">
-          <Button icon={ThumbsUp} onClick={() => vote('up')} aria-label={`Gefällt mir: ${entry.name}, ${entry.upvotes} Stimmen`} title="Gefällt mir">
+        <span className="flex shrink-0 gap-1">
+          <Button icon={ThumbsUp} onClick={() => vote('up')} aria-label={`Gefällt mir: ${entry.name}, ${entry.upvotes} Stimmen`} title="Gefällt mir" className="px-3 tabular-nums">
             {entry.upvotes}
           </Button>
-          <Button icon={ThumbsDown} onClick={() => vote('down')} aria-label={`Gefällt mir nicht: ${entry.name}, ${entry.downvotes} Stimmen`} title="Gefällt mir nicht">
+          <Button icon={ThumbsDown} onClick={() => vote('down')} aria-label={`Gefällt mir nicht: ${entry.name}, ${entry.downvotes} Stimmen`} title="Gefällt mir nicht" className="px-3 tabular-nums">
             {entry.downvotes}
           </Button>
           <IconButton icon={Trash2} label={`„${entry.name}“ löschen`} variant="danger" onClick={remove} />
         </span>
       ) : (
-        <span className="flex gap-3 pr-2 text-stage-muted">
+        <span className="flex shrink-0 gap-3 text-sm tabular-nums text-stage-muted">
           <span className="flex items-center gap-1">
             <ThumbsUp className="h-4 w-4" aria-label="Gefällt mir" /> {entry.upvotes}
           </span>
@@ -87,11 +101,13 @@ function MoodboardTile({ item, onOpen }: { item: MoodboardItem; onOpen: () => vo
       type="button"
       onClick={onOpen}
       aria-label={`Bild öffnen: ${item.title || 'ohne Titel'}`}
-      className="card group relative aspect-square w-full overflow-hidden transition-colors hover:border-signal"
+      className="group relative aspect-square w-full overflow-hidden rounded-xl border border-stage-line bg-stage-surface"
     >
-      {url && <img src={url} alt={item.title} loading="lazy" className="h-full w-full object-cover" />}
+      {url && <img src={url} alt={item.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />}
       {item.title && (
-        <span className="absolute inset-x-0 bottom-0 truncate bg-stage-bg/85 px-2 py-1 text-left text-sm font-medium">{item.title}</span>
+        <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-6 text-left text-sm font-medium">
+          {item.title}
+        </span>
       )}
     </button>
   );
@@ -125,8 +141,8 @@ function MoodboardLightbox({ item, onClose }: { item: MoodboardItem; onClose: ()
       size="full"
       headerExtra={isAdmin && <IconButton icon={Trash2} label="Bild löschen" variant="danger" onClick={remove} />}
     >
-      <div className="flex h-full items-center justify-center bg-stage-bg p-2">
-        {url && <img src={url} alt={item.title} className="max-h-full max-w-full object-contain" />}
+      <div className="flex h-full items-center justify-center bg-stage-bg p-3">
+        {url && <img src={url} alt={item.title} className="max-h-full max-w-full rounded-lg object-contain" />}
       </div>
     </Modal>
   );
@@ -147,6 +163,7 @@ export function BandBrainstorm() {
   const ranked = [...bandNames].sort(
     (a, b) => b.upvotes - b.downvotes - (a.upvotes - a.downvotes) || a.name.localeCompare(b.name, 'de'),
   );
+  const maxVotes = Math.max(0, ...bandNames.map((entry) => entry.upvotes));
   const openImage = moodboard.find((item) => item.id === openImageId) ?? null;
 
   const submitName = async (event: FormEvent) => {
@@ -184,74 +201,78 @@ export function BandBrainstorm() {
   };
 
   return (
-    <div className="flex flex-col gap-10">
-      <section>
-        <SectionTitle>Bandnamen</SectionTitle>
-        {isAdmin && (
-          <form onSubmit={submitName} className="mb-4 flex gap-2">
-            <input
-              className="field min-w-0"
-              value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-              placeholder="Neuer Namensvorschlag …"
-              aria-label="Neuer Namensvorschlag"
-            />
-            <Button type="submit" variant="primary" icon={Plus} disabled={!newName.trim()} className="shrink-0">
-              Hinzufügen
-            </Button>
-          </form>
-        )}
-        {ranked.length === 0 ? (
-          <EmptyState icon={Lightbulb} title="Noch keine Namensideen">
-            {isAdmin ? 'Trage oben den ersten Vorschlag ein.' : 'Der Admin kann im Admin-Bearbeitungsmodus Vorschläge eintragen.'}
-          </EmptyState>
-        ) : (
-          <ol className="flex flex-col gap-2">
-            {ranked.map((entry, index) => (
-              <BandNameRow key={entry.id} entry={entry} rank={index + 1} />
-            ))}
-          </ol>
-        )}
-        {!isAdmin && ranked.length > 0 && (
-          <p className="mt-3 text-sm text-stage-muted">Abgestimmt wird gemeinsam: Der Admin trägt die Stimmen im Admin-Bearbeitungsmodus ein.</p>
-        )}
-      </section>
+    <div>
+      <PageHeader title="Band-Brainstorming" description="Namensideen sammeln, abstimmen und den Look der Band festhalten." />
 
-      <section>
-        <SectionTitle
-          action={
-            isAdmin && (
-              <>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
-                  multiple
-                  className="sr-only"
-                  aria-label="Bilder auswählen"
-                  onChange={(event) => uploadImages(event.target.files)}
-                />
-                <Button variant="primary" icon={uploading ? Loader2 : Upload} disabled={uploading} onClick={() => fileInput.current?.click()}>
-                  {uploading ? 'Wird gespeichert …' : 'Bilder hochladen'}
-                </Button>
-              </>
-            )
-          }
-        >
-          Moodboard
-        </SectionTitle>
-        {moodboard.length === 0 ? (
-          <EmptyState icon={ImageIcon} title="Das Moodboard ist noch leer">
-            {isAdmin ? 'Lade Logos, Bühnen-Outfits oder Design-Ideen hoch. Große Fotos werden automatisch verkleinert.' : 'Hier erscheinen Logos und Design-Ideen, sobald der Admin sie teilt.'}
-          </EmptyState>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {moodboard.map((item) => (
-              <MoodboardTile key={item.id} item={item} onOpen={() => setOpenImageId(item.id)} />
-            ))}
-          </div>
-        )}
-      </section>
+      <div className="grid items-start gap-8 lg:grid-cols-2">
+        <section>
+          <SectionTitle>Bandnamen</SectionTitle>
+          {isAdmin && (
+            <form onSubmit={submitName} className="mb-3 flex gap-2">
+              <input
+                className="field min-w-0"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                placeholder="Neuer Namensvorschlag …"
+                aria-label="Neuer Namensvorschlag"
+              />
+              <Button type="submit" variant="primary" icon={Plus} disabled={!newName.trim()} className="shrink-0">
+                Hinzufügen
+              </Button>
+            </form>
+          )}
+          {ranked.length === 0 ? (
+            <EmptyState icon={Lightbulb} title="Noch keine Namensideen">
+              {isAdmin ? 'Trage oben den ersten Vorschlag ein.' : 'Der Admin kann im Admin-Bearbeitungsmodus Vorschläge eintragen.'}
+            </EmptyState>
+          ) : (
+            <ol className="card divide-y divide-stage-line">
+              {ranked.map((entry, index) => (
+                <BandNameRow key={entry.id} entry={entry} rank={index + 1} maxVotes={maxVotes} />
+              ))}
+            </ol>
+          )}
+          {!isAdmin && ranked.length > 0 && (
+            <p className="mt-3 text-sm text-stage-subtle">Abgestimmt wird gemeinsam: Der Admin trägt die Stimmen im Admin-Bearbeitungsmodus ein.</p>
+          )}
+        </section>
+
+        <section>
+          <SectionTitle
+            action={
+              isAdmin && (
+                <>
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                    multiple
+                    className="sr-only"
+                    aria-label="Bilder auswählen"
+                    onChange={(event) => uploadImages(event.target.files)}
+                  />
+                  <Button icon={uploading ? Loader2 : Upload} disabled={uploading} onClick={() => fileInput.current?.click()}>
+                    {uploading ? 'Wird gespeichert …' : 'Bilder hochladen'}
+                  </Button>
+                </>
+              )
+            }
+          >
+            Moodboard
+          </SectionTitle>
+          {moodboard.length === 0 ? (
+            <EmptyState icon={ImageIcon} title="Das Moodboard ist noch leer">
+              {isAdmin ? 'Lade Logos, Bühnen-Outfits oder Design-Ideen hoch. Große Fotos werden automatisch verkleinert.' : 'Hier erscheinen Logos und Design-Ideen, sobald der Admin sie teilt.'}
+            </EmptyState>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {moodboard.map((item) => (
+                <MoodboardTile key={item.id} item={item} onOpen={() => setOpenImageId(item.id)} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
       {openImage && <MoodboardLightbox item={openImage} onClose={() => setOpenImageId(null)} />}
     </div>

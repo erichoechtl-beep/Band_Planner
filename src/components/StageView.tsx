@@ -3,11 +3,11 @@ import { ChevronLeft, ChevronRight, FileText, ListOrdered, Maximize, Minimize, M
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { db, type Song } from '../db/schema';
 import { transposeSong } from '../lib/transpose';
+import { StatusBar } from './Header';
 import { PdfViewer } from './PdfViewer';
 import { SongNotes } from './PersonalNotes';
-import { StatusBar } from './Header';
 import { TransposeTool } from './TransposeTool';
-import { Button, IconButton, Modal } from './ui';
+import { Button, IconButton, Modal, Stat, StructureFlow } from './ui';
 
 /** Hält das Display an, solange die Bühnenansicht offen ist (falls das Gerät es unterstützt). */
 function useWakeLock() {
@@ -57,16 +57,6 @@ function useFullscreen() {
   }, []);
 
   return { isSupported, isFullscreen, toggle };
-}
-
-function StageBadge({ label, value, tone }: { label: string; value: string; tone: 'green' | 'cyan' | 'white' }) {
-  const color = tone === 'green' ? 'text-neon border-neon' : tone === 'cyan' ? 'text-signal border-signal' : 'text-stage-text border-stage-line';
-  return (
-    <div className={`rounded-xl border-2 bg-stage-surface px-4 py-1.5 ${color}`}>
-      <div className="text-xs font-semibold uppercase tracking-wider text-stage-muted">{label}</div>
-      <div className="text-2xl font-extrabold leading-tight sm:text-4xl">{value}</div>
-    </div>
-  );
 }
 
 interface StageViewProps {
@@ -132,14 +122,15 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
 
   const semitones = song ? (transpositions[song.id] ?? 0) : 0;
   const shown = useMemo(() => (song ? transposeSong(song, semitones) : null), [song, semitones]);
+  const nextKey = nextSong ? transposeSong(nextSong, transpositions[nextSong.id] ?? 0).key : '';
 
   if (!data) return <div className="h-screen-safe bg-stage-bg" />;
 
   if (!data.setlist || !song || !shown) {
     return (
       <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-stage-bg p-6 text-center">
-        <Music2 className="h-12 w-12 text-stage-muted" aria-hidden />
-        <p className="text-2xl font-bold">{data.setlist ? 'Diese Setlist enthält keine Songs.' : 'Diese Setlist gibt es nicht mehr.'}</p>
+        <Music2 className="h-10 w-10 text-stage-subtle" aria-hidden />
+        <p className="text-xl font-semibold">{data.setlist ? 'Diese Setlist enthält keine Songs.' : 'Diese Setlist gibt es nicht mehr.'}</p>
         <Button variant="primary" icon={X} onClick={onExit}>
           Zurück zu den Setlists
         </Button>
@@ -147,15 +138,18 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
     );
   }
 
+  const progress = ((currentIndex + 1) / songs.length) * 100;
+  const tuningChange = nextSong && nextSong.tuning && nextSong.tuning !== song.tuning;
+
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-stage-bg pt-safe pb-safe">
       <StatusBar />
-      <header className="flex shrink-0 items-center gap-2 border-b border-stage-line bg-stage-surface px-2 py-1.5">
+      <header className="relative flex shrink-0 items-center gap-1 border-b border-stage-line bg-stage-surface px-2 py-1.5">
         <IconButton icon={X} label="Bühnenansicht beenden" onClick={onExit} />
         <div className="min-w-0 flex-1 text-center">
-          <div className="truncate text-sm font-semibold text-stage-muted">{data.setlist.name}</div>
-          <div className="text-lg font-extrabold tabular-nums leading-tight">
-            Song {currentIndex + 1} / {songs.length}
+          <div className="truncate text-xs font-medium text-stage-muted">{data.setlist.name}</div>
+          <div className="text-sm font-bold tabular-nums">
+            Song {currentIndex + 1} <span className="font-medium text-stage-subtle">/ {songs.length}</span>
           </div>
         </div>
         <IconButton icon={ListOrdered} label="Setlist anzeigen" onClick={() => setPanel('list')} />
@@ -166,40 +160,43 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
             onClick={fullscreen.toggle}
           />
         )}
+        <div className="absolute inset-x-0 bottom-0 h-0.5 bg-stage-line" aria-hidden>
+          <div className="h-full bg-neon transition-[width]" style={{ width: `${progress}%` }} />
+        </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4">
+      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:gap-6">
           <div>
-            <h2 className="break-words text-5xl font-black leading-[1.05] tracking-tight sm:text-7xl">{song.title}</h2>
-            {song.artist && <p className="mt-1 text-xl text-stage-muted">{song.artist}</p>}
+            <h2 className="break-words text-[44px] font-extrabold leading-[1.02] tracking-[-0.03em] sm:text-7xl">{song.title}</h2>
+            {song.artist && <p className="mt-2 text-lg text-stage-muted sm:text-xl">{song.artist}</p>}
           </div>
 
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            {shown.key && <StageBadge label="Tonart" value={shown.key} tone="green" />}
-            {song.bpm !== null && <StageBadge label="BPM" value={String(song.bpm)} tone="cyan" />}
-            {song.tuning && <StageBadge label="Stimmung" value={song.tuning} tone="white" />}
-            {song.duration && <StageBadge label="Dauer" value={song.duration} tone="white" />}
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+            {shown.key && <Stat size="xl" label="Tonart" value={shown.key} tone="green" />}
+            {song.bpm !== null && <Stat size="xl" label="BPM" value={String(song.bpm)} tone="cyan" />}
+            {song.tuning && <Stat size="xl" label="Stimmung" value={song.tuning} tone={song.tuning !== 'Standard E' ? 'amber' : 'neutral'} />}
+            {song.duration && <Stat size="xl" label="Dauer" value={song.duration} />}
           </div>
 
           {shown.structure && (
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-stage-muted">Song-Ablauf</h3>
-              <p className="break-words text-2xl font-bold leading-snug text-signal sm:text-3xl">{shown.structure}</p>
-            </div>
+            <section>
+              <h3 className="eyebrow mb-2">Song-Ablauf</h3>
+              <StructureFlow structure={shown.structure} size="xl" />
+            </section>
           )}
 
           {notes && notes.length > 0 && (
             <button
               type="button"
               onClick={() => setPanel('notes')}
-              className="rounded-xl border-2 border-warn/60 bg-warn/10 p-3 text-left"
+              className="rounded-xl border border-warn/40 bg-warn/[0.07] px-4 py-3 text-left transition-colors hover:bg-warn/10"
             >
-              <span className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-warn">
-                <StickyNote className="h-4 w-4" aria-hidden /> Meine Notizen
+              <span className="eyebrow mb-1 flex items-center gap-1.5 text-warn">
+                <StickyNote className="h-3.5 w-3.5" aria-hidden /> Meine Notizen
               </span>
               {notes.map((note) => (
-                <span key={note.id} className="block whitespace-pre-wrap break-words text-xl font-semibold">
+                <span key={note.id} className="block whitespace-pre-wrap break-words text-lg font-medium sm:text-xl">
                   {note.text}
                 </span>
               ))}
@@ -208,13 +205,13 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
 
           {/* Im Querformat stehen Schnellzugriffe und Transponierer in einer Reihe, damit nichts gescrollt werden muss. */}
           <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            <Button variant="accent" icon={FileText} className="min-h-16 text-lg" disabled={!song.pdfName} onClick={() => setPanel('pdf')}>
+            <Button variant="accent" icon={FileText} className="min-h-14 text-base" disabled={!song.pdfName} onClick={() => setPanel('pdf')}>
               {song.pdfName ? 'PDF-Leadsheet' : 'Kein PDF'}
             </Button>
-            <Button icon={Music2} className="min-h-16 text-lg" disabled={!song.chords} onClick={() => setPanel('chords')}>
+            <Button icon={Music2} className="min-h-14 text-base" disabled={!song.chords} onClick={() => setPanel('chords')}>
               Akkorde
             </Button>
-            <Button icon={StickyNote} className="min-h-16 text-lg" onClick={() => setPanel('notes')}>
+            <Button icon={StickyNote} className="min-h-14 text-base" onClick={() => setPanel('notes')}>
               Notizen{notes && notes.length > 0 ? ` (${notes.length})` : ''}
             </Button>
             <div className="sm:col-span-3">
@@ -230,37 +227,35 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
         </div>
       </main>
 
-      <footer className="shrink-0 border-t border-stage-line bg-stage-surface p-2">
-        <p className="mb-2 truncate px-1 text-center text-lg">
+      <footer className="shrink-0 border-t border-stage-line bg-stage-surface p-2 sm:p-3">
+        <div className="mb-2 flex min-h-7 items-center justify-center gap-2 px-1 text-center text-[15px]">
           {nextSong ? (
-            <>
-              <span className="text-stage-muted">Als Nächstes: </span>
-              <span className="font-bold text-neon">{nextSong.title}</span>
-              {transposeSong(nextSong, transpositions[nextSong.id] ?? 0).key && (
-                <span className="text-stage-muted"> · {transposeSong(nextSong, transpositions[nextSong.id] ?? 0).key}</span>
-              )}
-              {nextSong.tuning !== song.tuning && nextSong.tuning && <span className="font-bold text-warn"> · Umstimmen: {nextSong.tuning}</span>}
-            </>
+            <p className="truncate">
+              <span className="eyebrow mr-2">Als Nächstes</span>
+              <span className="font-semibold">{nextSong.title}</span>
+              {nextKey && <span className="font-mono text-stage-muted"> · {nextKey}</span>}
+              {tuningChange && <span className="font-semibold text-warn"> · Umstimmen: {nextSong.tuning}</span>}
+            </p>
           ) : (
-            <span className="font-bold text-signal">Letzter Song der Setlist</span>
+            <p className="font-semibold text-signal">Letzter Song der Setlist</p>
           )}
-        </p>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             disabled={!previousSong}
             onClick={() => goTo(currentIndex - 1)}
-            className="flex min-h-20 min-w-0 items-center justify-center gap-1 rounded-xl border-2 border-stage-line bg-stage-raised px-2 text-lg font-extrabold disabled:opacity-40 sm:min-h-24 sm:text-2xl"
+            className="flex min-h-20 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-stage-line bg-stage-raised px-2 text-lg font-bold transition-colors hover:bg-stage-hover disabled:opacity-30 sm:min-h-24 sm:text-xl"
           >
-            <ChevronLeft className="h-8 w-8 shrink-0" aria-hidden /> Vorheriger Song
+            <ChevronLeft className="h-7 w-7 shrink-0" aria-hidden /> Vorheriger Song
           </button>
           <button
             type="button"
             disabled={!nextSong}
             onClick={() => goTo(currentIndex + 1)}
-            className="flex min-h-20 min-w-0 items-center justify-center gap-1 rounded-xl bg-neon px-2 text-lg font-extrabold text-stage-bg disabled:opacity-40 sm:min-h-24 sm:text-2xl"
+            className="flex min-h-20 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-neon px-2 text-lg font-bold text-stage-bg transition-colors hover:bg-[#2fd36b] disabled:bg-stage-raised disabled:text-stage-subtle sm:min-h-24 sm:text-xl"
           >
-            Nächster Song <ChevronRight className="h-8 w-8 shrink-0" aria-hidden />
+            Nächster Song <ChevronRight className="h-7 w-7 shrink-0" aria-hidden />
           </button>
         </div>
       </footer>
@@ -268,41 +263,46 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
       {panel === 'pdf' && <PdfViewer songId={song.id} title={song.title} onClose={() => setPanel(null)} />}
 
       {panel === 'chords' && (
-        <Modal title={`Akkorde: ${song.title}`} onClose={() => setPanel(null)} size="full">
-          <pre className="p-4 font-mono text-xl leading-relaxed sm:text-3xl">{shown.chords}</pre>
+        <Modal title={song.title} subtitle={`Akkorde${semitones !== 0 ? ` · ${shown.key}` : ''}`} onClose={() => setPanel(null)} size="full">
+          <pre className="p-5 font-mono text-xl leading-relaxed sm:p-8 sm:text-3xl">{shown.chords}</pre>
         </Modal>
       )}
 
       {panel === 'notes' && (
-        <Modal title={`Meine Notizen: ${song.title}`} onClose={() => setPanel(null)}>
-          <div className="p-4">
+        <Modal title="Meine Notizen" subtitle={song.title} onClose={() => setPanel(null)}>
+          <div className="p-5">
             <SongNotes song={song} />
           </div>
         </Modal>
       )}
 
       {panel === 'list' && (
-        <Modal title={data.setlist.name} onClose={() => setPanel(null)}>
-          <ol className="flex flex-col gap-2 p-4">
-            {songs.map((entry, position) => (
-              <li key={entry.id}>
-                <button
-                  type="button"
-                  aria-current={position === currentIndex ? 'true' : undefined}
-                  onClick={() => {
-                    goTo(position);
-                    setPanel(null);
-                  }}
-                  className={`flex min-h-14 w-full items-center gap-3 rounded-lg border p-3 text-left text-lg font-semibold ${
-                    position === currentIndex ? 'border-neon bg-stage-raised text-neon' : 'border-stage-line bg-stage-bg'
-                  }`}
-                >
-                  <span className="w-7 shrink-0 text-center tabular-nums text-stage-muted">{position + 1}</span>
-                  <span className="min-w-0 flex-1 break-words">{entry.title}</span>
-                  {entry.key && <span className="text-base text-stage-muted">{entry.key}</span>}
-                </button>
-              </li>
-            ))}
+        <Modal title={data.setlist.name} subtitle={`${songs.length} Songs`} onClose={() => setPanel(null)}>
+          <ol className="flex flex-col gap-1 p-3">
+            {songs.map((entry, position) => {
+              const isCurrent = position === currentIndex;
+              return (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    aria-current={isCurrent ? 'true' : undefined}
+                    onClick={() => {
+                      goTo(position);
+                      setPanel(null);
+                    }}
+                    className={`flex min-h-14 w-full items-center gap-3 rounded-lg px-3 text-left transition-colors ${
+                      isCurrent ? 'bg-neon/10 text-neon' : 'hover:bg-stage-raised'
+                    }`}
+                  >
+                    <span className={`w-7 shrink-0 text-center text-sm font-semibold tabular-nums ${isCurrent ? '' : 'text-stage-subtle'}`}>
+                      {String(position + 1).padStart(2, '0')}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-base font-semibold">{entry.title}</span>
+                    {entry.key && <span className="font-mono text-sm text-stage-muted">{entry.key}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         </Modal>
       )}
