@@ -1,0 +1,78 @@
+{
+  "format": "band-planner",
+  "schemaVersion": 1,
+  "lastUpdated": "2026-01-15T18:00:00.000Z",
+  "songs": [
+    {
+      "id": "song-tage-wie-diese",
+      "title": "Tage wie diese",
+      "artist": "Die Toten Hosen",
+      "key": "A",
+      "bpm": 126,
+      "tuning": "Standard E",
+      "duration": "03:27",
+      "structure": "Intro → Strophe → Refrain → Strophe → Refrain → Solo (F#m) → Refrain → Outro",
+      "chords": "[Intro]\nA        E        F#m      D\n\n[Strophe]\nA        E        F#m      D\nA        E        D        D\n\n[Refrain]\nD        A        E        F#m\nD        A        E        E\n\nOutro: A  E  D  A",
+      "pdf": null
+    },
+    {
+      "id": "song-major-tom",
+      "title": "Major Tom (Völlig losgelöst)",
+      "artist": "Peter Schilling",
+      "key": "Am",
+      "bpm": 138,
+      "tuning": "Standard E",
+      "duration": "04:58",
+      "structure": "Intro → Strophe → Pre-Chorus → Refrain → Strophe → Refrain → Solo (Am) → Refrain → Outro",
+      "chords": "[Intro]\nAm       F        C        G\n\n[Strophe]\nAm       F        C        G\nAm       F        G        G\n\n[Pre-Chorus]\nF        G        Am       Am\n\n[Refrain]\nC        G        Am       F\nC        G        F        G",
+      "pdf": null
+    },
+    {
+      "id": "song-westerland",
+      "title": "Westerland",
+      "artist": "Die Ärzte",
+      "key": "G",
+      "bpm": 172,
+      "tuning": "Drop D",
+      "duration": "03:41",
+      "structure": "Intro → Strophe → Refrain → Strophe → Refrain → Solo (Em) → Refrain → Outro",
+      "chords": "[Intro]\nG        D        Em       C\n\n[Strophe]\nG        D        Em       C\nG        D        C        C\n\n[Refrain]\nC        G        D        Em\nC        G        D        D\n\nOutro: G  D  C  G",
+      "pdf": {
+        "name": "Westerland-Leadsheet.pdf",
+        "base64": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgL0YyIDYgMCBSIC9GMyA3IDAgUiA+PiA+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDYxNiA+PgpzdHJlYW0KQlQKL0YyIDI2IFRmIDEgMCAwIDEgNTYgNzQyIFRtIChXZXN0ZXJsYW5kKSBUagovRjEgMTIgVGYgMSAwIDAgMSA1NiA3MTggVG0gKEJlaXNwaWVsLUxlYWRzaGVldCAtIEFra29yZGZvbGdlIG9obmUgVGV4dCkgVGoKL0YyIDE1IFRmIDEgMCAwIDEgNTYgNjY0IFRtIChJbnRybykgVGoKL0YzIDE0IFRmIDEgMCAwIDEgNTYgNjM4IFRtICh8IEcgIHwgRCAgfCBFbSB8IEMgIHwpIFRqCi9GMiAxNSBUZiAxIDAgMCAxIDU2IDU4NCBUbSAoU3Ryb3BoZSkgVGoKL0YzIDE0IFRmIDEgMCAwIDEgNTYgNTU4IFRtICh8IEcgIHwgRCAgfCBFbSB8IEMgIHwpIFRqCi9GMyAxNCBUZiAxIDAgMCAxIDU2IDUzMiBUbSAofCBHICB8IEQgIHwgQyAgfCBDICB8KSBUagovRjIgMTUgVGYgMSAwIDAgMSA1NiA0NzggVG0gKFJlZnJhaW4pIFRqCi9GMyAxNCBUZiAxIDAgMCAxIDU2IDQ1MiBUbSAofCBDICB8IEcgIHwgRCAgfCBFbSB8KSBUagovRjMgMTQgVGYgMSAwIDAgMSA1NiA0MjYgVG0gKHwgQyAgfCBHICB8IEQgIHwgRCAgfCkgVGoKL0YyIDE1IFRmIDEgMCAwIDEgNTYgMzcyIFRtIChPdXRybykgVGoKL0YzIDE0IFRmIDEgMCAwIDEgNTYgMzQ2IFRtICh8IEcgIHwgRCAgfCBDICB8IEcgIHwpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvRm9udCAvU3VidHlwZSAvVHlwZTEgL0Jhc2VGb250IC9IZWx2ZXRpY2EgPj4KZW5kb2JqCjYgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhLUJvbGQgPj4KZW5kb2JqCjcgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvQ291cmllci1Cb2xkID4+CmVuZG9iagp4cmVmCjAgOAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNjEgMDAwMDAgbiAKMDAwMDAwMDkyNyAwMDAwMCBuIAowMDAwMDAwOTk3IDAwMDAwIG4gCjAwMDAwMDEwNzIgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA4IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoxMTQ1CiUlRU9GCg=="
+      }
+    }
+  ],
+  "setlists": [
+    {
+      "id": "setlist-hauptkonzert-2026",
+      "name": "Hauptkonzert 2026",
+      "songIds": [
+        "song-tage-wie-diese",
+        "song-major-tom",
+        "song-westerland"
+      ]
+    }
+  ],
+  "bandNames": [
+    {
+      "id": "name-feedback-fabrik",
+      "name": "Die Feedback-Fabrik",
+      "upvotes": 4,
+      "downvotes": 1
+    },
+    {
+      "id": "name-kellerfrequenz",
+      "name": "Kellerfrequenz",
+      "upvotes": 3,
+      "downvotes": 0
+    },
+    {
+      "id": "name-drop-d-dynastie",
+      "name": "Drop-D-Dynastie",
+      "upvotes": 1,
+      "downvotes": 2
+    }
+  ],
+  "moodboard": []
+}

@@ -1,0 +1,120 @@
+import type { BandDataFile, PersonalNote } from './schema';
+import { SEED_LEADSHEET_BASE64 } from './seedPdf';
+
+// Start-Daten beim allerersten Öffnen. Tempo, Tonart und Dauer sind Beispielwerte zum
+// Ausprobieren und sollten vor der ersten Probe an die eigene Version angepasst werden.
+// Die Akkordfelder enthalten bewusst nur Akkordfolgen und keine Liedtexte.
+
+export const SEED_BAND_DATA: BandDataFile = {
+  format: 'band-planner',
+  schemaVersion: 1,
+  lastUpdated: '2026-01-15T18:00:00.000Z',
+  songs: [
+    {
+      id: 'song-tage-wie-diese',
+      title: 'Tage wie diese',
+      artist: 'Die Toten Hosen',
+      key: 'A',
+      bpm: 126,
+      tuning: 'Standard E',
+      duration: '03:27',
+      structure: 'Intro → Strophe → Refrain → Strophe → Refrain → Solo (F#m) → Refrain → Outro',
+      chords: [
+        '[Intro]',
+        'A        E        F#m      D',
+        '',
+        '[Strophe]',
+        'A        E        F#m      D',
+        'A        E        D        D',
+        '',
+        '[Refrain]',
+        'D        A        E        F#m',
+        'D        A        E        E',
+        '',
+        'Outro: A  E  D  A',
+      ].join('\n'),
+      pdf: null,
+    },
+    {
+      id: 'song-major-tom',
+      title: 'Major Tom (Völlig losgelöst)',
+      artist: 'Peter Schilling',
+      key: 'Am',
+      bpm: 138,
+      tuning: 'Standard E',
+      duration: '04:58',
+      structure: 'Intro → Strophe → Pre-Chorus → Refrain → Strophe → Refrain → Solo (Am) → Refrain → Outro',
+      chords: [
+        '[Intro]',
+        'Am       F        C        G',
+        '',
+        '[Strophe]',
+        'Am       F        C        G',
+        'Am       F        G        G',
+        '',
+        '[Pre-Chorus]',
+        'F        G        Am       Am',
+        '',
+        '[Refrain]',
+        'C        G        Am       F',
+        'C        G        F        G',
+      ].join('\n'),
+      pdf: null,
+    },
+    {
+      id: 'song-westerland',
+      title: 'Westerland',
+      artist: 'Die Ärzte',
+      key: 'G',
+      bpm: 172,
+      tuning: 'Drop D',
+      duration: '03:41',
+      structure: 'Intro → Strophe → Refrain → Strophe → Refrain → Solo (Em) → Refrain → Outro',
+      chords: [
+        '[Intro]',
+        'G        D        Em       C',
+        '',
+        '[Strophe]',
+        'G        D        Em       C',
+        'G        D        C        C',
+        '',
+        '[Refrain]',
+        'C        G        D        Em',
+        'C        G        D        D',
+        '',
+        'Outro: G  D  C  G',
+      ].join('\n'),
+      pdf: { name: 'Westerland-Leadsheet.pdf', base64: SEED_LEADSHEET_BASE64 },
+    },
+  ],
+  setlists: [
+    {
+      id: 'setlist-hauptkonzert-2026',
+      name: 'Hauptkonzert 2026',
+      songIds: ['song-tage-wie-diese', 'song-major-tom', 'song-westerland'],
+    },
+  ],
+  bandNames: [
+    { id: 'name-feedback-fabrik', name: 'Die Feedback-Fabrik', upvotes: 4, downvotes: 1 },
+    { id: 'name-kellerfrequenz', name: 'Kellerfrequenz', upvotes: 3, downvotes: 0 },
+    { id: 'name-drop-d-dynastie', name: 'Drop-D-Dynastie', upvotes: 1, downvotes: 2 },
+  ],
+  moodboard: [],
+};
+
+export const SEED_PERSONAL_NOTES: PersonalNote[] = [
+  {
+    id: 'note-tage-wie-diese',
+    songId: 'song-tage-wie-diese',
+    songTitle: 'Tage wie diese',
+    text: 'Gitarre: Delay-Pedal im 2. Refrain aktivieren.',
+    updatedAt: '2026-01-15T18:00:00.000Z',
+  },
+  {
+    id: 'note-westerland',
+    songId: 'song-westerland',
+    songTitle: 'Westerland',
+    text: 'Vor dem Song auf Drop D umstimmen – Ersatzgitarre liegt bereit.',
+    updatedAt: '2026-01-15T18:00:00.000Z',
+  },
+];

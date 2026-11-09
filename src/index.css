@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-stage-bg text-stage-text font-sans antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* Klar sichtbarer Fokus für Tastatur und Fußpedale */
+  :focus-visible {
+    outline: 3px solid #06b6d4;
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea,
+  select {
+    /* Unter 16 px zoomt iOS beim Antippen ungewollt in die Seite */
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  .field {
+    @apply min-h-touch w-full rounded-lg border border-stage-line bg-stage-bg px-3 py-2 text-stage-text placeholder:text-stage-muted/70 focus:border-signal focus:outline-none;
+  }
+
+  .field-label {
+    @apply mb-1 block text-sm font-semibold text-stage-muted;
+  }
+
+  .card {
+    @apply rounded-xl border border-stage-line bg-stage-surface;
+  }
+}
+
+@layer utilities {
+  .h-screen-safe {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+  }
+}
