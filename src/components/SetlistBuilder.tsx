@@ -17,20 +17,39 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check, GripVertical, ListMusic, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  Check,
+  ChevronDown,
+  CircleCheck,
+  CircleHelp,
+  CircleMinus,
+  GripVertical,
+  ListMusic,
+  Pencil,
+  Play,
+  Plus,
+  Search,
+  Trash2,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
-import { createSetlist, deleteSetlist, renameSetlist, setSetlistSongs } from '../db/bandActions';
-import { db, describeError, type Setlist, type Song } from '../db/schema';
+import { addSongToSetlist, createSetlist, deleteSetlist, renameSetlist, setSetlistSongs, setSongStatus } from '../db/bandActions';
+import { db, describeError, SONG_STATUSES, type Setlist, type Song, type SongStatus } from '../db/schema';
+import { groupByStatus, reorderWithinGroup, resolveSongs, STATUS_LABEL, STATUS_SHORT } from '../lib/setlist';
 import { formatTotalDuration, sumDurations } from '../lib/time';
+import { NoteButton } from './SongNotes';
 import { Badge, Button, EmptyState, IconButton, InfoNote, Modal, PageHeader } from './ui';
 
 const STANDARD_TUNING = 'Standard E';
 
-function resolveSongs(setlist: Setlist, songsById: Map<string, Song>): Song[] {
-  return setlist.songIds.flatMap((id) => songsById.get(id) ?? []);
-}
+const STATUS_STYLE: Record<SongStatus, { icon: LucideIcon; color: string; dot: string; description: string }> = {
+  fix: { icon: CircleCheck, color: 'text-ok', dot: 'bg-ok', description: 'Wird gespielt' },
+  offen: { icon: CircleHelp, color: 'text-warn', dot: 'bg-warn', description: 'Noch nicht entschieden' },
+  raus: { icon: CircleMinus, color: 'text-stage-subtle', dot: 'bg-stage-strong', description: 'Steht zur Wahl, wird nicht gespielt' },
+};
 
 function countTuningChanges(songs: Song[]): number {
   let changes = 0;
@@ -40,16 +59,26 @@ function countTuningChanges(songs: Song[]): number {
   return changes;
 }
 
-function SetlistMeta({ songs, compact = false }: { songs: Song[]; compact?: boolean }) {
-  const { seconds, missing } = sumDurations(songs.map((song) => song.duration));
-  const changes = countTuningChanges(songs);
+function SetlistMeta({ setlist, songsById, compact = false }: { setlist: Setlist; songsById: Map<string, Song>; compact?: boolean }) {
+  const groups = groupByStatus(setlist, resolveSongs(setlist, songsById));
+  const fix = sumDurations(groups.fix.map((song) => song.duration));
+  const offen = sumDurations(groups.offen.map((song) => song.duration));
+  const changes = countTuningChanges(groups.fix);
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-stage-muted">
-      <span className="font-semibold tabular-nums text-brand">{formatTotalDuration(seconds)}</span>
+      <span className="font-semibold tabular-nums text-brand">{formatTotalDuration(fix.seconds)}</span>
       <span aria-hidden>·</span>
       <span>
-        {songs.length} {songs.length === 1 ? 'Song' : 'Songs'}
+        {groups.fix.length} {groups.fix.length === 1 ? 'Song fix' : 'Songs fix'}
       </span>
+      {groups.offen.length > 0 && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="text-warn">
+            {groups.offen.length} in Abklärung{offen.seconds > 0 && !compact ? ` (+${formatTotalDuration(offen.seconds)})` : ''}
+          </span>
+        </>
+      )}
       {!compact && changes > 0 && (
         <>
           <span aria-hidden>·</span>
@@ -58,10 +87,10 @@ function SetlistMeta({ songs, compact = false }: { songs: Song[]; compact?: bool
           </span>
         </>
       )}
-      {missing > 0 && (
+      {!compact && fix.missing > 0 && (
         <>
           <span aria-hidden>·</span>
-          <span className="text-warn">{missing} ohne Dauer</span>
+          <span className="text-warn">{fix.missing} ohne Dauer</span>
         </>
       )}
     </span>
@@ -74,83 +103,309 @@ function SongColumns({ song }: { song: Song }) {
   return (
     <>
       <span className="hidden w-14 font-mono text-sm font-semibold text-brand sm:block">{song.key || '–'}</span>
-      <span className="hidden w-16 text-sm tabular-nums text-accent sm:block">{song.bpm ?? '–'}</span>
-      <span className="hidden w-28 truncate text-sm font-medium text-warn md:block">{tuning}</span>
+      <span className="hidden w-14 text-sm tabular-nums text-accent sm:block">{song.bpm ?? '–'}</span>
+      <span className="hidden w-28 truncate text-sm font-medium text-warn lg:block">{tuning}</span>
       <span className="hidden w-12 text-right text-sm tabular-nums text-stage-muted sm:block">{song.duration || '–'}</span>
     </>
   );
 }
 
-function SongTitleCell({ song, position }: { song: Song; position: number }) {
+function SongTitleCell({ song, position, muted }: { song: Song; position: number | null; muted: boolean }) {
   const tuning = song.tuning && song.tuning !== STANDARD_TUNING ? song.tuning : '';
   return (
     <>
-      <span className="w-7 shrink-0 text-center text-sm font-semibold tabular-nums text-stage-subtle">{String(position).padStart(2, '0')}</span>
+      <span className="w-7 shrink-0 text-center text-sm font-semibold tabular-nums text-stage-subtle">
+        {position === null ? '–' : String(position).padStart(2, '0')}
+      </span>
       <span className="min-w-0 flex-1 py-2">
-        <span className="block truncate font-medium">{song.title}</span>
+        <span className={`block truncate font-medium ${muted ? 'text-stage-muted' : ''}`}>{song.title}</span>
+        {song.artist && <span className="hidden truncate text-xs text-stage-subtle sm:block">{song.artist}</span>}
         <span className="mt-0.5 flex flex-wrap gap-1.5 sm:hidden">
           {song.key && <Badge tone="green">{song.key}</Badge>}
           {song.bpm !== null && <Badge tone="cyan">{song.bpm} BPM</Badge>}
           {tuning && <Badge tone="amber">{tuning}</Badge>}
           {song.duration && <Badge>{song.duration}</Badge>}
         </span>
-        {tuning && <span className="mt-0.5 hidden truncate text-xs font-medium text-warn sm:block md:hidden">{tuning}</span>}
+        {tuning && <span className="mt-0.5 hidden truncate text-xs font-medium text-warn sm:block lg:hidden">{tuning}</span>}
       </span>
     </>
   );
 }
 
-function ListHead({ withHandle }: { withHandle: boolean }) {
+function ListHead({ editable }: { editable: boolean }) {
   return (
-    <div className="eyebrow hidden items-center gap-2 px-2 pb-2 sm:flex" aria-hidden>
-      {withHandle && <span className="w-12" />}
+    <div className="eyebrow hidden items-center gap-2 px-2 pb-1 sm:flex" aria-hidden>
+      {editable && <span className="w-12" />}
       <span className="w-7 text-center">#</span>
       <span className="flex-1">Titel</span>
       <span className="w-14">Tonart</span>
-      <span className="w-16">BPM</span>
-      <span className="hidden w-28 md:block">Stimmung</span>
+      <span className="w-14">BPM</span>
+      <span className="hidden w-28 lg:block">Stimmung</span>
       <span className="w-12 text-right">Dauer</span>
-      {withHandle && <span className="w-12" />}
+      <span className="w-12 text-center">Notiz</span>
+      {editable && <span className="w-12 sm:w-[7.5rem]" />}
     </div>
   );
 }
 
-function Row({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`flex min-h-touch items-center gap-2 px-2 ${className}`}>{children}</div>;
+/** Status-Knopf mit Menü: fix, in Abklärung, nicht in Setlist – oder ganz entfernen. */
+function StatusMenu({ status, songTitle, onSelect, onRemove }: { status: SongStatus; songTitle: string; onSelect: (status: SongStatus) => void; onRemove: () => void }) {
+  const [open, setOpen] = useState<'down' | 'up' | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const { icon: Icon, color } = STATUS_STYLE[status];
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(null);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const toggle = () => {
+    if (open) return setOpen(null);
+    const rect = ref.current?.getBoundingClientRect();
+    // Unten im Bild klappt das Menü nach oben auf, damit es nicht unter der Navigationsleiste verschwindet.
+    setOpen(rect && window.innerHeight - rect.bottom < 300 ? 'up' : 'down');
+  };
+
+  const choose = (action: () => void) => {
+    setOpen(null);
+    action();
+  };
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-haspopup="menu"
+        aria-expanded={open !== null}
+        aria-label={`Status von „${songTitle}“: ${STATUS_LABEL[status]}`}
+        title="Status ändern"
+        className={`flex h-12 min-w-12 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-semibold transition-colors hover:bg-stage-raised sm:w-[7.5rem] sm:justify-start sm:border sm:border-stage-line sm:px-2.5 ${color}`}
+      >
+        <Icon className="h-5 w-5 shrink-0" aria-hidden />
+        <span className="hidden flex-1 truncate text-left sm:inline">{STATUS_SHORT[status]}</span>
+        <ChevronDown className="hidden h-4 w-4 shrink-0 text-stage-subtle sm:block" aria-hidden />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label={`Status für „${songTitle}“`}
+          className={`absolute right-0 z-40 w-64 rounded-xl border border-stage-line bg-stage-surface p-1 shadow-pop ${open === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+        >
+          {SONG_STATUSES.map((option) => {
+            const style = STATUS_STYLE[option];
+            const OptionIcon = style.icon;
+            return (
+              <button
+                key={option}
+                type="button"
+                role="menuitemradio"
+                aria-checked={option === status}
+                onClick={() => choose(() => onSelect(option))}
+                className={`flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-stage-raised ${option === status ? 'bg-stage-raised' : ''}`}
+              >
+                <OptionIcon className={`h-5 w-5 shrink-0 ${style.color}`} aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">{STATUS_LABEL[option]}</span>
+                  <span className="block text-xs text-stage-muted">{style.description}</span>
+                </span>
+                {option === status && <Check className="h-4 w-4 shrink-0 text-brand" aria-hidden />}
+              </button>
+            );
+          })}
+          <div className="my-1 border-t border-stage-line" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => choose(onRemove)}
+            className="flex min-h-touch w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] font-medium text-danger transition-colors hover:bg-danger/10"
+          >
+            <X className="h-5 w-5 shrink-0" aria-hidden />
+            Aus der Setlist entfernen
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
-function SortableSongRow({ song, position, onRemove }: { song: Song; position: number; onRemove: () => void }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: song.id });
+interface RowProps {
+  song: Song;
+  status: SongStatus;
+  position: number | null;
+  hasNote: boolean;
+  editable: boolean;
+  onStatus: (status: SongStatus) => void;
+  onRemove: () => void;
+  handle?: ReactNode;
+}
+
+function RowContent({ song, status, position, hasNote, editable, onStatus, onRemove, handle }: RowProps) {
+  return (
+    <div className="flex min-h-touch items-center gap-1 sm:gap-2">
+      {handle}
+      <SongTitleCell song={song} position={position} muted={status === 'raus'} />
+      <SongColumns song={song} />
+      <NoteButton song={song} hasNote={hasNote} />
+      {editable && <StatusMenu status={status} songTitle={song.title} onSelect={onStatus} onRemove={onRemove} />}
+    </div>
+  );
+}
+
+function SortableSongRow(props: RowProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: props.song.id });
+  const handle = (
+    <button
+      ref={setActivatorNodeRef}
+      type="button"
+      aria-label={`„${props.song.title}“ verschieben`}
+      title="Ziehen zum Sortieren"
+      className="flex h-12 w-12 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-stage-subtle hover:text-stage-text active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
+    >
+      <GripVertical className="h-5 w-5" aria-hidden />
+    </button>
+  );
   return (
     <li
       ref={setNodeRef}
-      data-setlist-row={song.title}
+      data-setlist-row={props.song.title}
+      data-status={props.status}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`rounded-lg border bg-stage-surface ${isDragging ? 'relative z-10 border-brand shadow-pop' : 'border-transparent hover:border-stage-line'}`}
     >
-      <Row className="pl-0 pr-0">
-        <button
-          ref={setActivatorNodeRef}
-          type="button"
-          aria-label={`„${song.title}“ verschieben`}
-          title="Ziehen zum Sortieren"
-          className="flex h-12 w-12 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-stage-subtle hover:text-stage-text active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-5 w-5" aria-hidden />
-        </button>
-        <SongTitleCell song={song} position={position} />
-        <SongColumns song={song} />
-        <IconButton icon={X} label={`„${song.title}“ aus der Setlist entfernen`} onClick={onRemove} />
-      </Row>
+      <RowContent {...props} handle={handle} />
     </li>
+  );
+}
+
+interface SectionProps {
+  setlist: Setlist;
+  status: SongStatus;
+  songs: Song[];
+  startAt: number | null;
+  editable: boolean;
+  noteSongIds: Set<string>;
+  collapsible?: boolean;
+}
+
+function StatusSection({ setlist, status, songs, startAt, editable, noteSongIds, collapsible = false }: SectionProps) {
+  const { toast } = useFeedback();
+  const [collapsed, setCollapsed] = useState(collapsible);
+  // Sofortiges Umsortieren in der Anzeige, bis die Datenbank bestätigt hat – verhindert ein Zurückspringen.
+  const [optimistic, setOptimistic] = useState<string[] | null>(null);
+  useEffect(() => setOptimistic(null), [setlist.songIds]);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 80, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  if (songs.length === 0) return null;
+  const byId = new Map(songs.map((song) => [song.id, song]));
+  const shown = optimistic ? optimistic.flatMap((id) => byId.get(id) ?? []) : songs;
+  const { seconds } = sumDurations(shown.map((song) => song.duration));
+  const style = STATUS_STYLE[status];
+
+  const run = async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error) {
+      toast(describeError(error), 'error');
+    }
+  };
+
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const ids = shown.map((song) => song.id);
+    const next = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+    setOptimistic(next);
+    try {
+      await setSetlistSongs(setlist.id, reorderWithinGroup(setlist.songIds, next));
+    } catch (error) {
+      setOptimistic(null);
+      toast(describeError(error), 'error');
+    }
+  };
+
+  const rowProps = (song: Song, index: number): RowProps => ({
+    song,
+    status,
+    position: startAt === null ? null : startAt + index,
+    hasNote: noteSongIds.has(song.id),
+    editable,
+    onStatus: (next) => run(() => setSongStatus(setlist.id, song.id, next)),
+    onRemove: () => run(() => setSetlistSongs(setlist.id, setlist.songIds.filter((id) => id !== song.id))),
+  });
+
+  const heading = (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} aria-hidden />
+      <span className="font-semibold">{STATUS_LABEL[status]}</span>
+      <span className="text-sm font-normal text-stage-muted">
+        {songs.length} {songs.length === 1 ? 'Song' : 'Songs'}
+        {seconds > 0 && status !== 'raus' ? ` · ${formatTotalDuration(seconds)}` : ''}
+      </span>
+    </span>
+  );
+
+  return (
+    <section aria-label={STATUS_LABEL[status]} className="pt-3 first:pt-1">
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-expanded={!collapsed}
+          className="flex min-h-touch w-full items-center justify-between gap-2 rounded-lg px-2 text-left hover:bg-stage-raised"
+        >
+          {heading}
+          <ChevronDown className={`h-5 w-5 shrink-0 text-stage-subtle transition-transform ${collapsed ? '' : 'rotate-180'}`} aria-hidden />
+        </button>
+      ) : (
+        <h4 className="flex min-h-10 items-center px-2">{heading}</h4>
+      )}
+
+      {!collapsed &&
+        (editable ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={shown.map((song) => song.id)} strategy={verticalListSortingStrategy}>
+              <ol className="flex flex-col gap-0.5">
+                {shown.map((song, index) => (
+                  <SortableSongRow key={song.id} {...rowProps(song, index)} />
+                ))}
+              </ol>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          <ol className="flex flex-col divide-y divide-stage-line/60">
+            {shown.map((song, index) => (
+              <li key={song.id} data-setlist-row={song.title} data-status={status} className="px-1">
+                <RowContent {...rowProps(song, index)} />
+              </li>
+            ))}
+          </ol>
+        ))}
+    </section>
   );
 }
 
 function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: Song[]; onClose: () => void }) {
   const { toast } = useFeedback();
   const [search, setSearch] = useState('');
+  const [addAs, setAddAs] = useState<SongStatus>('fix');
   const term = search.trim().toLocaleLowerCase('de');
   const candidates = songs
     .filter((song) => !setlist.songIds.includes(song.id))
@@ -159,7 +414,7 @@ function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: S
 
   const add = async (song: Song) => {
     try {
-      await setSetlistSongs(setlist.id, [...setlist.songIds, song.id]);
+      await addSongToSetlist(setlist.id, song.id, addAs);
     } catch (error) {
       toast(describeError(error), 'error');
     }
@@ -168,6 +423,29 @@ function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: S
   return (
     <Modal title="Songs hinzufügen" subtitle={setlist.name} onClose={onClose}>
       <div className="flex min-h-full flex-col gap-3 p-5">
+        <div>
+          <span className="field-label">Hinzufügen als</span>
+          <div role="group" aria-label="Status für neue Songs" className="grid grid-cols-3 gap-1 rounded-lg border border-stage-line bg-stage-bg p-1">
+            {SONG_STATUSES.map((option) => {
+              const style = STATUS_STYLE[option];
+              const OptionIcon = style.icon;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={addAs === option}
+                  onClick={() => setAddAs(option)}
+                  className={`flex min-h-touch items-center justify-center gap-1.5 rounded-md px-2 text-sm font-semibold transition-colors ${
+                    addAs === option ? 'bg-stage-surface shadow-panel' : 'text-stage-muted hover:text-stage-text'
+                  }`}
+                >
+                  <OptionIcon className={`h-4 w-4 shrink-0 ${style.color}`} aria-hidden />
+                  {STATUS_SHORT[option]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-3.5 h-5 w-5 text-stage-subtle" aria-hidden />
           <input
@@ -190,6 +468,7 @@ function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: S
               <button
                 type="button"
                 onClick={() => add(song)}
+                aria-label={`„${song.title}“ als ${STATUS_LABEL[addAs]} hinzufügen`}
                 className="flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-stage-raised"
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
@@ -220,40 +499,11 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
   const { toast, confirm } = useFeedback();
   const [adding, setAdding] = useState(false);
   const [editingName, setEditingName] = useState<string | null>(null);
-  // Sofortiges Umsortieren in der Anzeige, bis die Datenbank bestätigt hat – verhindert ein Zurückspringen.
-  const [optimisticOrder, setOptimisticOrder] = useState<string[] | null>(null);
+  const noteSongIds = useLiveQuery(async () => new Set((await db.personalNotes.toArray()).map((note) => note.songId)), [], new Set<string>());
 
-  useEffect(() => setOptimisticOrder(null), [setlist.songIds]);
-
-  const shownSetlist = optimisticOrder ? { ...setlist, songIds: optimisticOrder } : setlist;
-  const songs = resolveSongs(shownSetlist, songsById);
-
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 80, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
-    if (!over || active.id === over.id) return;
-    const ids = songs.map((song) => song.id);
-    const next = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
-    setOptimisticOrder(next);
-    try {
-      await setSetlistSongs(setlist.id, next);
-    } catch (error) {
-      setOptimisticOrder(null);
-      toast(describeError(error), 'error');
-    }
-  };
-
-  const removeSong = async (songId: string) => {
-    try {
-      await setSetlistSongs(setlist.id, setlist.songIds.filter((id) => id !== songId));
-    } catch (error) {
-      toast(describeError(error), 'error');
-    }
-  };
+  const songs = resolveSongs(setlist, songsById);
+  const groups = groupByStatus(setlist, songs);
+  const playable = groups.fix.length + groups.offen.length;
 
   const saveName = async (event: FormEvent) => {
     event.preventDefault();
@@ -284,17 +534,11 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card min-w-0">
       <div className="flex flex-col gap-4 border-b border-stage-line p-4 sm:flex-row sm:items-center sm:p-5">
         {editingName !== null && isAdmin ? (
           <form onSubmit={saveName} className="flex min-w-0 flex-1 gap-2">
-            <input
-              className="field font-semibold"
-              value={editingName}
-              onChange={(event) => setEditingName(event.target.value)}
-              aria-label="Name der Setlist"
-              autoFocus
-            />
+            <input className="field font-semibold" value={editingName} onChange={(event) => setEditingName(event.target.value)} aria-label="Name der Setlist" autoFocus />
             <IconButton icon={Check} label="Namen speichern" variant="primary" type="submit" disabled={!editingName.trim()} />
             <IconButton icon={X} label="Abbrechen" onClick={() => setEditingName(null)} />
           </form>
@@ -303,7 +547,7 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
             <div className="min-w-0 flex-1">
               <p className="eyebrow">Setlist</p>
               <h3 className="break-words text-xl font-bold tracking-tight sm:text-2xl">{setlist.name}</h3>
-              <SetlistMeta songs={songs} />
+              <SetlistMeta setlist={setlist} songsById={songsById} />
             </div>
             {isAdmin && (
               <div className="flex shrink-0">
@@ -313,7 +557,7 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
             )}
           </div>
         )}
-        <Button variant="primary" icon={Play} onClick={onStartStage} disabled={songs.length === 0} className="sm:shrink-0">
+        <Button variant="primary" icon={Play} onClick={onStartStage} disabled={playable === 0} className="sm:shrink-0">
           Bühnenansicht starten
         </Button>
       </div>
@@ -327,34 +571,15 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
           </div>
         ) : (
           <>
-            <ListHead withHandle={isAdmin} />
-            {isAdmin ? (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={songs.map((song) => song.id)} strategy={verticalListSortingStrategy}>
-                  <ol className="flex flex-col gap-0.5">
-                    {songs.map((song, index) => (
-                      <SortableSongRow key={song.id} song={song} position={index + 1} onRemove={() => removeSong(song.id)} />
-                    ))}
-                  </ol>
-                </SortableContext>
-              </DndContext>
-            ) : (
-              <ol className="flex flex-col divide-y divide-stage-line/60">
-                {songs.map((song, index) => (
-                  <li key={song.id} data-setlist-row={song.title}>
-                    <Row>
-                      <SongTitleCell song={song} position={index + 1} />
-                      <SongColumns song={song} />
-                    </Row>
-                  </li>
-                ))}
-              </ol>
-            )}
+            <ListHead editable={isAdmin} />
+            <StatusSection setlist={setlist} status="fix" songs={groups.fix} startAt={1} editable={isAdmin} noteSongIds={noteSongIds} />
+            <StatusSection setlist={setlist} status="offen" songs={groups.offen} startAt={groups.fix.length + 1} editable={isAdmin} noteSongIds={noteSongIds} />
+            <StatusSection setlist={setlist} status="raus" songs={groups.raus} startAt={null} editable={isAdmin} noteSongIds={noteSongIds} collapsible />
           </>
         )}
 
         {isAdmin && (
-          <Button variant="ghost" icon={Plus} onClick={() => setAdding(true)} className="mt-1 w-full justify-start text-brand hover:text-brand">
+          <Button variant="ghost" icon={Plus} onClick={() => setAdding(true)} className="mt-2 w-full justify-start text-brand hover:text-brand">
             Songs hinzufügen
           </Button>
         )}
@@ -409,14 +634,7 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
 
       {isAdmin && newName !== null && (
         <form onSubmit={create} className="card mb-4 flex gap-2 p-3">
-          <input
-            className="field"
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            placeholder="Name, z. B. Acoustic Set"
-            aria-label="Name der neuen Setlist"
-            autoFocus
-          />
+          <input className="field" value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Name, z. B. Acoustic Set" aria-label="Name der neuen Setlist" autoFocus />
           <IconButton icon={Check} label="Setlist anlegen" variant="primary" type="submit" disabled={!newName.trim()} />
           <IconButton icon={X} label="Abbrechen" onClick={() => setNewName(null)} />
         </form>
@@ -427,7 +645,7 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
           {isAdmin ? 'Erstelle mit „Neue Setlist“ die erste Setlist.' : 'Lade im Bereich „Daten-Sync“ den aktuellen Band-Stand.'}
         </EmptyState>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-6">
+        <div className="grid items-start gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-6">
           {/* Handy: waagerecht wischbar, ab Desktop als Seitenleiste */}
           <ul
             className={`no-scrollbar -mx-4 gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 ${sorted.length > 1 ? 'flex' : 'hidden'}`}
@@ -447,7 +665,7 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
                   >
                     <span className={`block max-w-56 truncate text-sm font-semibold ${isActive ? 'text-stage-text' : 'text-stage-muted'}`}>{setlist.name}</span>
                     <span className="hidden lg:block">
-                      <SetlistMeta songs={resolveSongs(setlist, songsById)} compact />
+                      <SetlistMeta setlist={setlist} songsById={songsById} compact />
                     </span>
                   </button>
                 </li>
@@ -461,7 +679,7 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
       {!isAdmin && sorted.length > 0 && (
         <div className="mt-6">
           <InfoNote icon={ListMusic} tone="amber">
-            Nur Lesen – Änderungen an Setlists sind im Admin-Bearbeitungsmodus möglich.
+            Nur Lesen – Reihenfolge und Status pflegt der Admin. Den gelben Zettel kannst du immer nutzen: Deine Notizen bleiben auf diesem Gerät.
           </InfoNote>
         </div>
       )}

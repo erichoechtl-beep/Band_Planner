@@ -2,10 +2,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronLeft, ChevronRight, FileText, ListOrdered, Maximize, Minimize, Music2, StickyNote, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { db, type Song } from '../db/schema';
+import { playableSongIds, statusOf } from '../lib/setlist';
 import { transposeSong } from '../lib/transpose';
 import { StatusBar, ThemeButton } from './Header';
 import { PdfViewer } from './PdfViewer';
-import { SongNotes } from './PersonalNotes';
+import { SongNotes } from './SongNotes';
 import { TransposeTool } from './TransposeTool';
 import { Button, IconButton, Modal, Stat, StructureFlow } from './ui';
 
@@ -70,7 +71,8 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
   const data = useLiveQuery(async () => {
     const setlist = await db.setlists.get(setlistId);
     if (!setlist) return { setlist: null, songs: [] as Song[] };
-    const rows = await db.songs.bulkGet(setlist.songIds);
+    // Nur fixe Songs und solche in Abklärung; „Nicht in Setlist“ erscheint auf der Bühne nicht.
+    const rows = await db.songs.bulkGet(playableSongIds(setlist));
     return { setlist, songs: rows.filter((song): song is Song => song !== undefined) };
   }, [setlistId]);
 
@@ -171,6 +173,9 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
           <div>
             <h2 className="break-words text-[44px] font-extrabold leading-[1.02] tracking-[-0.03em] sm:text-7xl">{song.title}</h2>
             {song.artist && <p className="mt-2 text-lg text-stage-muted sm:text-xl">{song.artist}</p>}
+            {statusOf(data.setlist, song.id) === 'offen' && (
+              <p className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-warn/15 px-2.5 py-1 text-sm font-semibold text-warn">In Abklärung – noch nicht fix</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
@@ -299,6 +304,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
                       {String(position + 1).padStart(2, '0')}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-base font-semibold">{entry.title}</span>
+                    {statusOf(data.setlist!, entry.id) === 'offen' && <span className="text-xs font-semibold text-warn">Abklärung</span>}
                     {entry.key && <span className="font-mono text-sm text-stage-muted">{entry.key}</span>}
                   </button>
                 </li>

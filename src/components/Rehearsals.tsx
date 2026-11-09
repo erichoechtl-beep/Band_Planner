@@ -5,44 +5,8 @@ import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
 import { deleteRehearsal, saveRehearsal, type RehearsalInput } from '../db/bandActions';
 import { db, describeError, isValidDate, isValidTime, type Rehearsal } from '../db/schema';
+import { fmtLong, fmtMonthShort, fmtMonthYear, fmtWeekdayShort, keyToDate, relativeLabel, toKey, todayKey } from '../lib/dates';
 import { Button, EmptyState, IconButton, InfoNote, Modal, PageHeader, SectionTitle } from './ui';
-
-// ---------------------------------------------------------------------------
-// Datums-Helfer: Termine werden als lokales Datum „JJJJ-MM-TT“ gespeichert, ohne Zeitzone.
-// ---------------------------------------------------------------------------
-
-const pad = (value: number) => String(value).padStart(2, '0');
-
-function toKey(year: number, monthIndex: number, day: number): string {
-  return `${year}-${pad(monthIndex + 1)}-${pad(day)}`;
-}
-
-function todayKey(): string {
-  const now = new Date();
-  return toKey(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-function keyToDate(key: string): Date {
-  const [year, month, day] = key.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function daysBetween(fromKey: string, toKeyValue: string): number {
-  return Math.round((keyToDate(toKeyValue).getTime() - keyToDate(fromKey).getTime()) / 86_400_000);
-}
-
-const fmtWeekdayShort = new Intl.DateTimeFormat('de-DE', { weekday: 'short' });
-const fmtMonthShort = new Intl.DateTimeFormat('de-DE', { month: 'short' });
-const fmtMonthYear = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
-const fmtLong = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-function relativeLabel(key: string, today: string): string | null {
-  const diff = daysBetween(today, key);
-  if (diff === 0) return 'Heute';
-  if (diff === 1) return 'Morgen';
-  if (diff > 1 && diff <= 30) return `in ${diff} Tagen`;
-  return null;
-}
 
 const titleOf = (rehearsal: Rehearsal) => rehearsal.title.trim() || 'Probe';
 const sortRehearsals = (a: Rehearsal, b: Rehearsal) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time);

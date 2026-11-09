@@ -9,7 +9,7 @@ import { formatBytes, looksLikePdf } from '../lib/files';
 import { isValidDuration } from '../lib/time';
 import { transposeSong } from '../lib/transpose';
 import { PdfViewer } from './PdfViewer';
-import { SongNotes } from './PersonalNotes';
+import { SongNotes } from './SongNotes';
 import { TransposeTool } from './TransposeTool';
 import { Badge, Button, EmptyState, IconButton, Modal, PageHeader, Stat, StructureFlow } from './ui';
 

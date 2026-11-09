@@ -9,6 +9,8 @@ import { Button } from './ui';
 const MIN_GAP_MS = 20_000;
 /** Solange die App sichtbar ist, wird zusätzlich regelmäßig nachgefragt. */
 const INTERVAL_MS = 3 * 60_000;
+/** Wartezeit nach dem Wiederverbinden */
+const ONLINE_DELAY_MS = 2_000;
 
 /**
  * Holt neue Band-Stände automatisch vom Server: beim Öffnen, beim Zurückkehren in die App,
@@ -58,7 +60,12 @@ export function useAutoSync(): AutoSyncState {
     const onVisible = () => {
       if (document.visibilityState === 'visible') void check();
     };
-    const onOnline = () => void check(true);
+    // Nach dem Wiederverbinden (z. B. WLAN-Wechsel) kurz warten, bis das Netz wirklich bereit ist.
+    let onlineDelay: number | undefined;
+    const onOnline = () => {
+      window.clearTimeout(onlineDelay);
+      onlineDelay = window.setTimeout(() => void check(true), ONLINE_DELAY_MS);
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
     window.addEventListener('focus', onVisible);
@@ -68,6 +75,7 @@ export function useAutoSync(): AutoSyncState {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('focus', onVisible);
       window.clearInterval(timer);
+      window.clearTimeout(onlineDelay);
     };
   }, [check]);
 

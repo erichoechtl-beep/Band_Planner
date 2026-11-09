@@ -1,17 +1,17 @@
-import { CalendarDays, Check, Database, Lightbulb, ListMusic, Lock, Menu, Moon, Music, StickyNote, Sun, Unlock, type LucideIcon } from 'lucide-react';
+import { CalendarDays, Check, Database, FolderOpen, House, ListMusic, Lock, Menu, Moon, Music, Sun, Unlock, type LucideIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useAdmin, type AppMode, type Theme } from '../context/AdminContext';
 import { LogoMark } from './Logo';
 import { IconButton, Modal } from './ui';
 
-export type TabId = 'setlists' | 'songs' | 'proben' | 'brainstorming' | 'notizen' | 'sync';
+export type TabId = 'start' | 'setlists' | 'songs' | 'proben' | 'medien' | 'sync';
 
 export const TABS: { id: TabId; label: string; short: string; description: string; icon: LucideIcon }[] = [
+  { id: 'start', label: 'Start', short: 'Start', description: 'Überblick: nächster Termin und Setlist', icon: House },
   { id: 'setlists', label: 'Setlists', short: 'Setlists', description: 'Konzertabläufe planen und spielen', icon: ListMusic },
   { id: 'songs', label: 'Songs & PDFs', short: 'Songs', description: 'Repertoire, Akkorde und Leadsheets', icon: Music },
   { id: 'proben', label: 'Proben', short: 'Proben', description: 'Probentermine und Auftritte im Kalender', icon: CalendarDays },
-  { id: 'brainstorming', label: 'Band-Brainstorming', short: 'Ideen', description: 'Bandnamen abstimmen und Moodboard', icon: Lightbulb },
-  { id: 'notizen', label: 'Persönliche Notizen', short: 'Notizen', description: 'Nur auf diesem Gerät gespeichert', icon: StickyNote },
+  { id: 'medien', label: 'Medien', short: 'Medien', description: 'Rider, Angebote, Pressetexte und Leadsheets', icon: FolderOpen },
   { id: 'sync', label: 'Daten-Sync', short: 'Sync', description: 'Band-Stand laden, exportieren, importieren', icon: Database },
 ];
 
@@ -95,7 +95,12 @@ export function Header({ activeTab, onSelectTab }: NavProps) {
         <StatusBar />
         <header className="border-b border-stage-line bg-stage-surface">
           <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
-            <div className="flex min-w-0 items-center gap-3 lg:shrink-0">
+            <button
+              type="button"
+              onClick={() => onSelectTab('start')}
+              aria-label="Zur Startseite"
+              className="flex min-h-touch min-w-0 items-center gap-3 rounded-lg text-left lg:shrink-0"
+            >
               <LogoMark className="h-9 w-9 shrink-0" />
               <div className="min-w-0 leading-tight">
                 <h1 className="truncate text-base font-semibold tracking-tight">Band Planner</h1>
@@ -105,7 +110,7 @@ export function Header({ activeTab, onSelectTab }: NavProps) {
                   <span className="hidden lg:inline">{MODE_LABEL[isAdmin ? 'admin' : 'stage']}</span>
                 </p>
               </div>
-            </div>
+            </button>
 
             <nav aria-label="Hauptnavigation" className="hidden flex-1 items-center justify-center gap-1 lg:flex">
               {TABS.map(({ id, label, short, icon: Icon }) => {

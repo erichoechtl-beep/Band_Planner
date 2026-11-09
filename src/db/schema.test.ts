@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addBandName,
+  addDocument,
+  addSongToSetlist,
+  setSetlistSongs,
+  setSongStatus,
   deleteSong,
   saveBrainstormText,
   saveRehearsal,
@@ -324,6 +328,58 @@ describe('Probenkalender und Freitext', () => {
     await db.open();
     expect(await db.songs.toArray()).toEqual([expect.objectContaining({ id: 'song-alt', title: 'Alter Song' })]);
     expect(await db.rehearsals.count()).toBe(0);
+    expect(await db.documents.count()).toBe(0);
     expect((await buildBandDataFile()).brainstormText).toBe('');
+  });
+});
+
+describe('Setlist-Status und Dokumente', () => {
+  it('speichert den Status, exportiert ihn und räumt beim Entfernen auf', async () => {
+    const setlist = (await db.setlists.toArray())[0];
+    const [first, second] = setlist.songIds;
+    await setSongStatus(setlist.id, first, 'offen');
+    await setSongStatus(setlist.id, second, 'raus');
+    const exported = await buildBandDataFile();
+    expect(exported.setlists[0].songStatus).toEqual({ [first]: 'offen', [second]: 'raus' });
+
+    await setSetlistSongs(setlist.id, setlist.songIds.filter((id) => id !== first));
+    expect((await db.setlists.get(setlist.id))?.songStatus).toEqual({ [second]: 'raus' });
+  });
+
+  it('fügt Songs mit gewähltem Status hinzu', async () => {
+    const setlist = (await db.setlists.toArray())[0];
+    await saveSong(null, { title: 'Neu', artist: '', key: '', bpm: null, tuning: '', duration: '', structure: '', chords: '' }, { kind: 'keep' });
+    const added = (await db.songs.toArray()).find((song) => song.title === 'Neu')!;
+    await addSongToSetlist(setlist.id, added.id, 'offen');
+    const after = await db.setlists.get(setlist.id);
+    expect(after?.songIds.at(-1)).toBe(added.id);
+    expect(after?.songStatus?.[added.id]).toBe('offen');
+  });
+
+  it('lehnt unbekannte Status-Werte mit deutscher Meldung ab und ignoriert fremde Songs', () => {
+    const file = cloneSeed() as unknown as { setlists: { songIds: string[]; songStatus?: unknown }[] };
+    const id = file.setlists[0].songIds[0];
+    file.setlists[0].songStatus = { [id]: 'vielleicht' };
+    expect(() => parseBandData(file)).toThrow('Der Status „vielleicht“ ist unbekannt');
+    file.setlists[0].songStatus = { [id]: 'offen', 'gibt-es-nicht': 'fix' };
+    expect(parseBandData(file).setlists[0].songStatus).toEqual({ [id]: 'offen' });
+  });
+
+  it('exportiert und importiert Dokumente samt Inhalt', async () => {
+    const data = new TextEncoder().encode('Technischer Rider').buffer as ArrayBuffer;
+    await addDocument({ title: 'Rider 2026', category: 'rider', fileName: 'rider.txt', mimeType: 'text/plain', data });
+    const exported = await buildBandDataFile();
+    expect(exported.documents).toHaveLength(1);
+    expect(exported.documents[0]).toMatchObject({ title: 'Rider 2026', category: 'rider', size: data.byteLength });
+
+    await db.documents.clear();
+    await applyBandData(parseBandDataText(JSON.stringify({ ...exported, lastUpdated: '2099-01-01T00:00:00.000Z' })), 'Test');
+    const [restored] = await db.documents.toArray();
+    expect(new TextDecoder().decode(restored.data)).toBe('Technischer Rider');
+  });
+
+  it('akzeptiert ältere Dateien ohne Dokumente', () => {
+    const { documents: _d, ...older } = cloneSeed();
+    expect(parseBandData(older).documents).toEqual([]);
   });
 });

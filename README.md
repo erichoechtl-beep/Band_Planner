@@ -1,6 +1,6 @@
 # Band Planner
 
-Offline-First-PWA für Musikproben und Live-Auftritte: Setlists, Songs, PDF-Leadsheets, Transponierer, Probenkalender, Bandnamen, Moodboard, Freitext und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
+Offline-First-PWA für Musikproben und Live-Auftritte: Startseite mit Überblick, Setlists mit Song-Status, Songs mit PDF-Leadsheets, Transponierer, Probenkalender, Medien (Rider, Angebote, Pressetexte) und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
 
 ## Architektur & Funktionsweise
 
@@ -10,12 +10,12 @@ Offline-First-PWA für Musikproben und Live-Auftritte: Setlists, Songs, PDF-Lead
 
 | | Band-Daten | Persönliche Notizen |
 |---|---|---|
-| **Tabellen** | `songs`, `pdfs`, `setlists`, `bandNames`, `moodboard` | `personalNotes` |
+| **Tabellen** | `songs`, `pdfs`, `setlists`, `rehearsals`, `documents` (dazu `bandNames`, `moodboard` aus älteren Versionen) | `personalNotes` |
 | **Bearbeiten** | nur im Admin-Modus | immer, auch im Bühnen-Modus |
 | **Export** | ja, in `band-data.json` | nein, bleiben auf dem Gerät |
 | **Sync / Import** | werden komplett ersetzt | werden nie angefasst |
 
-Sync und Import laufen in einer Datenbank-Transaktion, zu der `personalNotes` gar nicht gehört. Die Datei wird vorher vollständig geprüft: Ist sie fehlerhaft, bleibt der alte Stand unverändert. Verschwindet ein Song aus den Band-Daten, bleiben die Notizen dazu unter „Notizen zu entfernten Songs“ erhalten.
+Sync und Import laufen in einer Datenbank-Transaktion, zu der `personalNotes` gar nicht gehört. Die Datei wird vorher vollständig geprüft: Ist sie fehlerhaft, bleibt der alte Stand unverändert. Verschwindet ein Song aus den Band-Daten, bleiben die Notizen dazu in der Datenbank erhalten und tauchen wieder auf, sobald der Song zurückkommt.
 
 Die App fragt nur nach, wenn etwas verloren ginge: bei nicht exportierten lokalen Änderungen oder wenn der neue Stand älter ist als der vorhandene.
 
@@ -99,16 +99,19 @@ Beim ersten Öffnen mit Internet holt sich das Gerät automatisch den aktuellen 
 
 - Nach dem Hochladen dauert es etwa eine Minute, bis GitHub die Seite neu gebaut hat. Danach erhalten alle Geräte den neuen Stand beim nächsten Öffnen oder spätestens nach drei Minuten.
 - Als Admin immer auf demselben Gerät arbeiten und vor dem Sync exportieren. Bei mehreren Admins gewinnt, wer zuletzt exportiert.
-- PDFs und Bilder stecken als Base64 in der JSON-Datei und vergrößern sie. GitHub warnt ab 50 MB und lehnt Dateien über 100 MB ab; auch Messenger setzen Grenzen. Große Fotos werden beim Hochladen ins Moodboard automatisch verkleinert, PDFs nicht.
+- PDFs und Bilder stecken als Base64 in der JSON-Datei und vergrößern sie. GitHub warnt ab 50 MB und lehnt Dateien über 100 MB ab; auch Messenger setzen Grenzen. Deshalb sind Dateien in den Medien auf 10 MB pro Stück begrenzt.
 
 ## Bedienhinweise
 
-- **Probenkalender:** Im Reiter **Proben** trägt der Admin Termine ein: Datum, optional Uhrzeit, Art (z. B. Probe, Auftritt), Ort und Notiz. Zum Anlegen auf **Termin hinzufügen** tippen oder einen Tag im Kalender wählen, zum Ändern oder Löschen auf den Termin tippen. Termine und der **Freitext** aus dem Band-Brainstorming stecken in der band-data.json und werden wie alles andere verteilt.
+- **Probenkalender:** Im Reiter **Proben** trägt der Admin Termine ein: Datum, optional Uhrzeit, Art (z. B. Probe, Auftritt), Ort und Notiz. Zum Anlegen auf **Termin hinzufügen** tippen oder einen Tag im Kalender wählen, zum Ändern oder Löschen auf den Termin tippen. Termine stecken in der band-data.json und werden wie alles andere verteilt.
+- **Song-Status in der Setlist:** Jeder Song hat einen Status: **Fix in Setlist**, **In Abklärung** oder **Nicht in Setlist**. Der Admin ändert ihn über den Status-Knopf rechts in der Zeile; dort lässt sich ein Song auch ganz entfernen. Die Bühnenansicht spielt erst alle fixen Songs, danach die in Abklärung (markiert); „Nicht in Setlist“ erscheint dort nicht. Die Gesamtdauer zählt nur fixe Songs.
+- **Persönliche Notizen:** Der kleine Zettel in jeder Setlist-Zeile leuchtet gelb, wenn es eine eigene Notiz gibt. Antippen öffnet die Notiz – das geht für alle, auch im Bühnen-Modus. Notizen bleiben auf dem Gerät.
+- **Medien:** Unter **Medien** liegen eigene Band-Dokumente (Technischer Rider, Stageplot, Angebot, Pressetext, Vertrag, Foto/Logo, Sonstiges – PDF, Bilder oder Office-Dateien bis 10 MB) und darunter alle Leadsheets aus den Songs mit Angabe, in welcher Setlist sie stehen. Hochladen, umbenennen und löschen kann der Admin, ansehen und herunterladen alle.
+- **Startseite:** Beim Öffnen zeigt die App den nächsten Termin, den Stand der Setlist und das Repertoire im Überblick.
 - **Darstellung:** Standard ist hell (Weiß und Blau). Den Dunkelmodus schaltet man am Handy über **Menü → Darstellung**, am Computer und in der Bühnenansicht über den Mond-Knopf ein. Die Wahl gilt pro Gerät.
 - **Bühnen-Modus** ist auf jedem neuen Gerät voreingestellt. Der Umschalter ist ein Schutz vor Versehen, keine Zugangskontrolle: Jeder kann auf seinem eigenen Gerät in den Admin-Modus wechseln, Änderungen betreffen aber nur dieses Gerät, bis jemand sie exportiert.
 - **Vollbild-Bühnenansicht:** Auf Geräten, die es unterstützen, bleibt das Display an. Bluetooth-Fußpedale blättern, wenn sie Pfeil- oder Bild-Tasten senden. Auf dem iPhone gibt es kein echtes Vollbild im Browser; als installierte App läuft die Ansicht trotzdem bildschirmfüllend.
 - **Transponieren** ändert nur die Anzeige, nie die gespeicherten Daten. Umgerechnet werden Akkordzeilen (`Am  F  C  G`), Inline-Akkorde (`[Am]Text`), Taktstriche (`| C | G |`), beschriftete Zeilen (`Outro: C G`) und Akkorde in Klammern im Song-Ablauf (`Solo (Am)`). Textzeilen bleiben unverändert. Kommt ein H-Akkord vor, gilt der Song als deutsch notiert (H = h, B = b). `Fis`/`Cis`-Schreibweise wird nicht erkannt.
-- **Voting:** Bandnamen-Stimmen sind Band-Daten und werden deshalb vom Admin eingetragen, z. B. in der Probe.
 - **Beispieldaten:** Tonart, Tempo und Dauer der Start-Songs sind Beispielwerte. Die Akkordfelder enthalten nur Akkordfolgen und sollten vor der ersten Probe geprüft werden.
 
 ## Projektstruktur

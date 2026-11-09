@@ -32,8 +32,21 @@ interface PdfViewerProps {
   onClose: () => void;
 }
 
+/** Leadsheet eines Songs aus der lokalen Datenbank. */
 export function PdfViewer({ songId, title, onClose }: PdfViewerProps) {
   const pdf = useLiveQuery(() => db.pdfs.get(songId), [songId], null);
+  return <PdfModal title={title} file={pdf} onClose={onClose} />;
+}
+
+interface PdfModalProps {
+  title: string;
+  /** null = wird geladen, undefined = nicht vorhanden */
+  file: { name: string; data: ArrayBuffer } | null | undefined;
+  onClose: () => void;
+}
+
+/** Zeigt ein beliebiges PDF seitenweise an – offline, mit Zoom und Download. */
+export function PdfModal({ title, file: pdf, onClose }: PdfModalProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(0);

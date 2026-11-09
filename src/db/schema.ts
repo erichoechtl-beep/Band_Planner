@@ -22,10 +22,17 @@ export interface Song {
   pdfName: string | null;
 }
 
+/** fix = fest eingeplant, offen = in Abklärung, raus = steht zur Wahl, ist aber nicht in der Setlist */
+export type SongStatus = 'fix' | 'offen' | 'raus';
+export const SONG_STATUSES: readonly SongStatus[] = ['fix', 'offen', 'raus'];
+
 export interface Setlist {
   id: string;
   name: string;
+  /** Reihenfolge aller Songs der Setlist, unabhängig vom Status */
   songIds: string[];
+  /** Status je Song; fehlt ein Eintrag, gilt der Song als fix. */
+  songStatus?: Record<string, SongStatus>;
 }
 
 export interface BandName {
@@ -48,6 +55,19 @@ export interface SongPdf {
   songId: string;
   name: string;
   data: ArrayBuffer;
+}
+
+/** Eigene Band-Dokumente wie Technischer Rider, Angebot oder Pressetext. */
+export interface BandDocument {
+  id: string;
+  title: string;
+  /** Kennung aus DOCUMENT_CATEGORIES; Unbekanntes gilt als „sonstiges“. */
+  category: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  data: ArrayBuffer;
+  createdAt: string;
 }
 
 /** Ein Termin im Probenkalender. Uhrzeit, Titel, Ort und Notiz sind optional. */
@@ -112,6 +132,12 @@ export interface BandDataFile {
   rehearsals: Rehearsal[];
   /** Gemeinsamer Freitext im Band-Brainstorming; fehlt in älteren Dateien. */
   brainstormText: string;
+  /** Band-Dokumente im Bereich „Medien“; fehlt in älteren Dateien. */
+  documents: DocumentFile[];
+}
+
+export interface DocumentFile extends Omit<BandDocument, 'data'> {
+  base64: string;
 }
 
 /** Die Band-Daten sind ungültig oder nicht erreichbar. */
@@ -138,7 +164,8 @@ function toTableRecords(file: BandDataFile) {
     ...item,
     data: base64ToArrayBuffer(base64),
   }));
-  return { songs, pdfs, setlists: file.setlists, bandNames: file.bandNames, moodboard, rehearsals: file.rehearsals };
+  const documents: BandDocument[] = file.documents.map(({ base64, ...item }) => ({ ...item, data: base64ToArrayBuffer(base64) }));
+  return { songs, pdfs, setlists: file.setlists, bandNames: file.bandNames, moodboard, rehearsals: file.rehearsals, documents };
 }
 
 /** Befüllt eine neue, leere Datenbank mit den deutschen Start-Daten. */
@@ -150,6 +177,7 @@ async function seedDatabase(tx: Transaction): Promise<void> {
   await tx.table('bandNames').bulkAdd(records.bandNames);
   await tx.table('moodboard').bulkAdd(records.moodboard);
   await tx.table('rehearsals').bulkAdd(records.rehearsals);
+  await tx.table('documents').bulkAdd(records.documents);
   await tx.table('personalNotes').bulkAdd(SEED_PERSONAL_NOTES);
   const meta: MetaEntry[] = [
     { key: 'bandDataUpdatedAt', value: SEED_BAND_DATA.lastUpdated },
@@ -167,6 +195,7 @@ class BandDatabase extends Dexie {
   moodboard!: Table<MoodboardItem, string>;
   pdfs!: Table<SongPdf, string>;
   rehearsals!: Table<Rehearsal, string>;
+  documents!: Table<BandDocument, string>;
   personalNotes!: Table<PersonalNote, string>;
   meta!: Table<MetaEntry, MetaKey>;
 
@@ -183,6 +212,8 @@ class BandDatabase extends Dexie {
     });
     // Version 2: Probenkalender. Bestehende Daten bleiben unverändert.
     this.version(2).stores({ rehearsals: 'id, date' });
+    // Version 3: Band-Dokumente im Bereich „Medien“.
+    this.version(3).stores({ documents: 'id, createdAt' });
     // „populate“ läuft genau einmal beim Anlegen der Datenbank. Löscht der Admin später
     // alle Songs, kommen die Beispieldaten also nicht zurück.
     this.on('populate', (tx) => seedDatabase(tx));
@@ -193,7 +224,7 @@ export const db = new BandDatabase();
 
 /** Alle Tabellen, die zum geteilten Band-Stand gehören. `personalNotes` fehlt hier absichtlich. */
 function bandTables() {
-  return [db.songs, db.pdfs, db.setlists, db.bandNames, db.moodboard, db.rehearsals, db.meta];
+  return [db.songs, db.pdfs, db.setlists, db.bandNames, db.moodboard, db.rehearsals, db.documents, db.meta];
 }
 
 /** Führt eine Admin-Änderung atomar aus und merkt sich, dass sie noch nicht exportiert wurde. */
@@ -331,7 +362,21 @@ function parseSetlist(raw: unknown, index: number, knownSongIds: Set<string>): S
   const songIds = [...new Set(raw.songIds)].filter(
     (id): id is string => typeof id === 'string' && knownSongIds.has(id),
   );
-  return { id: requireString(raw, 'id', context), name: requireString(raw, 'name', context), songIds };
+  const setlist: Setlist = { id: requireString(raw, 'id', context), name: requireString(raw, 'name', context), songIds };
+  if (raw.songStatus !== undefined && raw.songStatus !== null) {
+    if (!isRecord(raw.songStatus)) throw new BandDataError(`${context}: Die Angabe „songStatus“ ist ungültig.`);
+    const songStatus: Record<string, SongStatus> = {};
+    for (const id of songIds) {
+      const value = raw.songStatus[id];
+      if (value === undefined) continue;
+      if (!SONG_STATUSES.includes(value as SongStatus)) {
+        throw new BandDataError(`${context}: Der Status „${String(value)}“ ist unbekannt (erlaubt: fix, offen, raus).`);
+      }
+      songStatus[id] = value as SongStatus;
+    }
+    setlist.songStatus = songStatus;
+  }
+  return setlist;
 }
 
 function parseBandName(raw: unknown, index: number): BandName {
@@ -391,6 +436,24 @@ function parseRehearsal(raw: unknown, index: number): Rehearsal {
   };
 }
 
+function parseDocument(raw: unknown, index: number): DocumentFile {
+  const context = `Dokument ${index + 1}`;
+  if (!isRecord(raw)) throw new BandDataError(`${context}: Eintrag ist ungültig.`);
+  const label = typeof raw.title === 'string' && raw.title ? `Dokument „${raw.title}“` : context;
+  const base64 = requireString(raw, 'base64', label);
+  const data = decodeOrThrow(base64, label);
+  return {
+    id: requireString(raw, 'id', label),
+    title: requireString(raw, 'title', label),
+    category: optionalString(raw, 'category', label) || 'sonstiges',
+    fileName: requireString(raw, 'fileName', label),
+    mimeType: optionalString(raw, 'mimeType', label) || 'application/octet-stream',
+    size: data.byteLength,
+    createdAt: optionalString(raw, 'createdAt', label) || new Date(0).toISOString(),
+    base64,
+  };
+}
+
 /** Prüft eine geladene Datei vollständig, bevor irgendetwas in die Datenbank geschrieben wird. */
 export function parseBandData(raw: unknown): BandDataFile {
   if (!isRecord(raw)) throw new BandDataError('Die Datei enthält keine Band-Daten.');
@@ -426,6 +489,11 @@ export function parseBandData(raw: unknown): BandDataFile {
   const rehearsals = ((raw.rehearsals as unknown[] | undefined) ?? []).map(parseRehearsal);
   assertUniqueIds(rehearsals, 'Probentermine');
   const brainstormText = optionalString(raw, 'brainstormText', 'Datei');
+  if (raw.documents !== undefined && !Array.isArray(raw.documents)) {
+    throw new BandDataError('Die Angabe „documents“ muss eine Liste sein.');
+  }
+  const documents = ((raw.documents as unknown[] | undefined) ?? []).map(parseDocument);
+  assertUniqueIds(documents, 'Dokumente');
 
   return {
     format: BAND_DATA_FORMAT,
@@ -437,6 +505,7 @@ export function parseBandData(raw: unknown): BandDataFile {
     moodboard,
     rehearsals,
     brainstormText,
+    documents,
   };
 }
 
@@ -457,13 +526,14 @@ export function parseBandDataText(text: string): BandDataFile {
 /** Liest alle Band-Tabellen und verpackt sie samt Base64-Dateien. Persönliche Notizen bleiben außen vor. */
 export async function buildBandDataFile(): Promise<BandDataFile> {
   return db.transaction('r', bandTables(), async () => {
-    const [songs, pdfs, setlists, bandNames, moodboard, rehearsals, textEntry, status] = await Promise.all([
+    const [songs, pdfs, setlists, bandNames, moodboard, rehearsals, documents, textEntry, status] = await Promise.all([
       db.songs.toArray(),
       db.pdfs.toArray(),
       db.setlists.toArray(),
       db.bandNames.toArray(),
       db.moodboard.toArray(),
       db.rehearsals.orderBy('date').toArray(),
+      db.documents.orderBy('createdAt').toArray(),
       db.meta.get('brainstormText'),
       getBandStatus(),
     ]);
@@ -483,6 +553,7 @@ export async function buildBandDataFile(): Promise<BandDataFile> {
       moodboard: moodboard.map(({ data, ...item }) => ({ ...item, base64: arrayBufferToBase64(data) })),
       rehearsals,
       brainstormText: typeof textEntry?.value === 'string' ? textEntry.value : '',
+      documents: documents.map(({ data, ...item }) => ({ ...item, base64: arrayBufferToBase64(data) })),
     };
   });
 }
@@ -533,6 +604,7 @@ export async function applyBandData(file: BandDataFile, source: string): Promise
       db.bandNames.clear(),
       db.moodboard.clear(),
       db.rehearsals.clear(),
+      db.documents.clear(),
     ]);
     await db.songs.bulkAdd(records.songs);
     await db.pdfs.bulkAdd(records.pdfs);
@@ -540,6 +612,7 @@ export async function applyBandData(file: BandDataFile, source: string): Promise
     await db.bandNames.bulkAdd(records.bandNames);
     await db.moodboard.bulkAdd(records.moodboard);
     await db.rehearsals.bulkAdd(records.rehearsals);
+    await db.documents.bulkAdd(records.documents);
     await db.meta.bulkPut([
       { key: 'brainstormText', value: file.brainstormText },
       { key: 'bandDataUpdatedAt', value: file.lastUpdated },

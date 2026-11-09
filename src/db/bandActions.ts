@@ -1,4 +1,11 @@
-import { db, bandWrite, createId, type PersonalNote, type Rehearsal, type Song } from './schema';
+import { db, bandWrite, createId, type BandDocument, type PersonalNote, type Rehearsal, type Setlist, type Song, type SongStatus } from './schema';
+
+/** Entfernt Status-Einträge zu Songs, die nicht mehr in der Setlist stehen. */
+function pruneStatus(setlist: Setlist): void {
+  if (!setlist.songStatus) return;
+  const keep = new Set(setlist.songIds);
+  for (const id of Object.keys(setlist.songStatus)) if (!keep.has(id)) delete setlist.songStatus[id];
+}
 
 export type SongInput = Omit<Song, 'id' | 'pdfName'>;
 
@@ -32,6 +39,7 @@ export function deleteSong(id: string): Promise<void> {
     await db.pdfs.delete(id);
     await db.setlists.toCollection().modify((setlist) => {
       setlist.songIds = setlist.songIds.filter((songId) => songId !== id);
+      pruneStatus(setlist);
     });
   });
 }
@@ -56,7 +64,10 @@ export function deleteSetlist(id: string): Promise<void> {
 
 export function setSetlistSongs(id: string, songIds: string[]): Promise<void> {
   return bandWrite(async () => {
-    await db.setlists.update(id, { songIds });
+    await db.setlists.where('id').equals(id).modify((setlist) => {
+      setlist.songIds = songIds;
+      pruneStatus(setlist);
+    });
   });
 }
 
@@ -127,4 +138,43 @@ export async function savePersonalNote(note: Pick<PersonalNote, 'songId' | 'song
 
 export async function deletePersonalNote(id: string): Promise<void> {
   await db.personalNotes.delete(id);
+}
+
+/** Hängt einen Song mit dem gewählten Status an die Setlist an. */
+export function addSongToSetlist(setlistId: string, songId: string, status: SongStatus): Promise<void> {
+  return bandWrite(async () => {
+    await db.setlists.where('id').equals(setlistId).modify((setlist) => {
+      if (!setlist.songIds.includes(songId)) setlist.songIds = [...setlist.songIds, songId];
+      setlist.songStatus = { ...setlist.songStatus, [songId]: status };
+    });
+  });
+}
+
+/** Fix, in Abklärung oder nicht in der Setlist. */
+export function setSongStatus(setlistId: string, songId: string, status: SongStatus): Promise<void> {
+  return bandWrite(async () => {
+    await db.setlists.where('id').equals(setlistId).modify((setlist) => {
+      setlist.songStatus = { ...setlist.songStatus, [songId]: status };
+    });
+  });
+}
+
+export type DocumentInput = Pick<BandDocument, 'title' | 'category' | 'fileName' | 'mimeType' | 'data'>;
+
+export function addDocument(input: DocumentInput): Promise<string> {
+  return bandWrite(async () => {
+    const id = createId();
+    await db.documents.add({ ...input, id, size: input.data.byteLength, createdAt: new Date().toISOString() });
+    return id;
+  });
+}
+
+export function updateDocument(id: string, changes: Pick<BandDocument, 'title' | 'category'>): Promise<void> {
+  return bandWrite(async () => {
+    await db.documents.update(id, changes);
+  });
+}
+
+export function deleteDocument(id: string): Promise<void> {
+  return bandWrite(() => db.documents.delete(id));
 }

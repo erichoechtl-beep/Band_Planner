@@ -34,7 +34,7 @@ interface Result {
 const LARGE_FILE_BYTES = 25 * 1024 * 1024;
 
 function summarize(file: BandDataFile): string {
-  return `${file.songs.length} Songs, ${file.setlists.length} Setlists, ${file.bandNames.length} Bandnamen, ${file.moodboard.length} Bilder`;
+  return `${file.songs.length} Songs, ${file.setlists.length} Setlists, ${file.rehearsals.length} Termine, ${file.documents.length} Dokumente`;
 }
 
 interface SyncRowProps {

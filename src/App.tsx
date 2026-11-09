@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AutoSyncBanner, useAutoSync } from './components/AutoSync';
-import { BandBrainstorm } from './components/BandBrainstorm';
 import { DataSync } from './components/DataSync';
 import { BottomNav, Header, TABS, type TabId } from './components/Header';
-import { PersonalNotes } from './components/PersonalNotes';
+import { Home } from './components/Home';
+import { Media } from './components/Media';
 import { Rehearsals } from './components/Rehearsals';
 import { SetlistBuilder } from './components/SetlistBuilder';
 import { SongManager } from './components/SongManager';
@@ -20,7 +20,8 @@ function parseHash(hash: string): Route {
     return { kind: 'stage', setlistId: decodeURIComponent(parts[1]), index: Number.isInteger(index) && index >= 0 ? index : 0 };
   }
   const tab = TABS.find(({ id }) => id === parts[0]);
-  return { kind: 'tab', tab: tab?.id ?? 'setlists' };
+  // Ohne (oder mit veraltetem) Ziel öffnet die App auf der Startseite.
+  return { kind: 'tab', tab: tab?.id ?? 'start' };
 }
 
 function stageHash(setlistId: string, index: number): string {
@@ -31,7 +32,7 @@ export default function App() {
   const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
   // Läuft unabhängig von der Ansicht, damit jedes Gerät neue Band-Stände sofort erhält.
   const autoSync = useAutoSync();
-  const [lastTab, setLastTab] = useState<TabId>(route.kind === 'tab' ? route.tab : 'setlists');
+  const [lastTab, setLastTab] = useState<TabId>(route.kind === 'tab' ? route.tab : 'start');
 
   useEffect(() => {
     const update = () => {
@@ -76,11 +77,11 @@ export default function App() {
       <AutoSyncBanner {...autoSync} />
       {/* Unten Platz für die Navigationsleiste auf Handy und Tablet */}
       <main className="mx-auto max-w-6xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:pt-8 lg:pb-12">
+        {route.tab === 'start' && <Home onNavigate={selectTab} onStartStage={startStage} />}
         {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} />}
         {route.tab === 'songs' && <SongManager />}
         {route.tab === 'proben' && <Rehearsals />}
-        {route.tab === 'brainstorming' && <BandBrainstorm />}
-        {route.tab === 'notizen' && <PersonalNotes />}
+        {route.tab === 'medien' && <Media />}
         {route.tab === 'sync' && <DataSync />}
       </main>
       <BottomNav activeTab={lastTab} onSelectTab={selectTab} />

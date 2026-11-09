@@ -102,6 +102,7 @@ export const SEED_BAND_DATA: BandDataFile = {
   moodboard: [],
   rehearsals: [],
   brainstormText: '',
+  documents: [],
 };
 
 export const SEED_PERSONAL_NOTES: PersonalNote[] = [
