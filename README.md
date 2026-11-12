@@ -104,6 +104,7 @@ Beim ersten Öffnen mit Internet holt sich das Gerät automatisch den aktuellen 
 ## Bedienhinweise
 
 - **Termine:** Im Reiter **Termine** trägt der Admin Proben (blau) und Konzerte (orange) ein: Datum, optional Uhrzeit, Bezeichnung (z. B. „Adventmarkt“), Ort und Notiz. Zum Anlegen auf **Termin hinzufügen** tippen oder einen Tag im Kalender wählen, zum Ändern oder Löschen auf den Termin tippen. Termine stecken in der band-data.json und werden wie alles andere verteilt.
+- **PDF im Vollbild:** Der Knopf mit den Pfeilen im PDF-Viewer blendet die Kopfleiste aus; das Blatt nutzt die ganze Breite, wo möglich auch ohne Browserleiste. Zoom, „Vollbild beenden“ und Auto-Scroll blenden sich nach drei Sekunden aus und kommen per Tipp aufs Blatt zurück. Die Wahl gilt pro Gerät auch beim nächsten Öffnen.
 - **Fotos statt PDF:** Leadsheets und Drum Sheets können auch als Fotos hochgeladen werden (JPG, PNG …). Die App wandelt sie auf dem Gerät in ein PDF um – mehrere Fotos ergeben ein PDF mit einer Seite pro Bild. Anzeige, Auto-Scroll und Band-Sync funktionieren dadurch wie bei echten PDFs.
 - **Drum Sheets:** Jeder Song kann neben dem Leadsheet ein zweites PDF für den Drummer haben. Hochladen im Song-Editor unter „Leadsheet & Drum Sheet“; aufrufen in der Probeansicht (Knopf „Drums“, mit Auto-Scroll), in den Song-Details und unter **Medien**. Akkord-Texte werden nicht mehr gepflegt.
 - **Lead Vocals:** Bei jedem Song lässt sich auswählen, wer singt (Benji, Marc, Eric). Die Namen stehen in `src/config.ts`, ebenso der Bandname in der Kopfzeile.

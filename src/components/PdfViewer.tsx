@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Download, FileWarning, Loader2, Minus, Pause, Play, Plus, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { Download, FileWarning, Loader2, Maximize, Minimize, Minus, Pause, Play, Plus, RefreshCw, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { db } from '../db/schema';
 import { downloadBlob } from '../lib/files';
 import { Button, IconButton, Modal } from './ui';
@@ -25,6 +25,98 @@ function loadPdfEngine(): Promise<PdfEngine> {
 }
 
 const ZOOM_STEPS = [1, 1.25, 1.5, 2, 3];
+/** Merkt sich, ob Leadsheets im Vollbild geöffnet werden sollen (pro Gerät). */
+const FULLSCREEN_KEY = 'band-planner:pdf-vollbild';
+/** Im Vollbild blenden sich die Bedienelemente nach dieser Zeit ohne Berührung aus. */
+const CONTROLS_HIDE_MS = 3000;
+
+function readFullscreenPreference(): boolean {
+  try {
+    return localStorage.getItem(FULLSCREEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Optionaler Vollbildmodus: blendet die Kopfleiste aus und nutzt – wo das Gerät es kann –
+ * zusätzlich den Browser-Vollbildmodus. Die Wahl gilt beim nächsten Öffnen weiter.
+ */
+function useImmersive() {
+  const [immersive, setImmersive] = useState(readFullscreenPreference);
+  const enteredBrowserFullscreen = useRef(false);
+
+  const enterBrowserFullscreen = useCallback(() => {
+    const root = document.documentElement;
+    if (document.fullscreenElement || typeof root.requestFullscreen !== 'function' || !document.fullscreenEnabled) return;
+    root
+      .requestFullscreen()
+      .then(() => {
+        enteredBrowserFullscreen.current = true;
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const leaveBrowserFullscreen = useCallback(() => {
+    if (enteredBrowserFullscreen.current && document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+    enteredBrowserFullscreen.current = false;
+  }, []);
+
+  const set = useCallback(
+    (next: boolean) => {
+      setImmersive(next);
+      try {
+        localStorage.setItem(FULLSCREEN_KEY, next ? '1' : '0');
+      } catch {
+        // ohne localStorage gilt die Wahl nur jetzt
+      }
+      if (next) enterBrowserFullscreen();
+      else leaveBrowserFullscreen();
+    },
+    [enterBrowserFullscreen, leaveBrowserFullscreen],
+  );
+
+  useEffect(() => {
+    // Beendet jemand den Browser-Vollbildmodus (z. B. mit Esc), endet auch der Vollbildmodus der Ansicht.
+    const onChange = () => {
+      if (enteredBrowserFullscreen.current && !document.fullscreenElement) {
+        enteredBrowserFullscreen.current = false;
+        setImmersive(false);
+        try {
+          localStorage.setItem(FULLSCREEN_KEY, '0');
+        } catch {
+          // egal
+        }
+      }
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      leaveBrowserFullscreen();
+    };
+  }, [leaveBrowserFullscreen]);
+
+  // Esc beendet zuerst den Vollbildmodus und schließt erst danach das PDF. Hat die Ansicht selbst den
+  // Browser-Vollbildmodus geöffnet, übernimmt der Browser das Esc (siehe fullscreenchange oben).
+  useEffect(() => {
+    if (!immersive) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || enteredBrowserFullscreen.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      set(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [immersive, set]);
+
+  // Wurde der Vollbildmodus beim letzten Mal gewählt, gleich auch den Browser-Vollbildmodus versuchen.
+  useEffect(() => {
+    if (readFullscreenPreference()) enterBrowserFullscreen();
+  }, [enterBrowserFullscreen]);
+
+  return { immersive, setImmersive: set };
+}
 const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 /** Ohne bekannte Songlänge: so viele Pixel pro Sekunde */
 const DEFAULT_SPEED = 30;
@@ -94,6 +186,22 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
   const scrollerRef = useRef<HTMLDivElement>(null);
   const autoScroll = useAutoScroll(scrollerRef, durationSeconds);
   const [canScroll, setCanScroll] = useState(false);
+  const { immersive, setImmersive } = useImmersive();
+  const [controlsShown, setControlsShown] = useState(true);
+  const hideTimer = useRef<number | undefined>(undefined);
+
+  // Im Vollbild verschwinden die Bedienelemente nach kurzer Zeit; jede Berührung holt sie zurück.
+  const showControls = useCallback(() => {
+    setControlsShown(true);
+    window.clearTimeout(hideTimer.current);
+    if (immersive) hideTimer.current = window.setTimeout(() => setControlsShown(false), CONTROLS_HIDE_MS);
+  }, [immersive]);
+  useEffect(() => {
+    showControls();
+    return () => window.clearTimeout(hideTimer.current);
+  }, [showControls]);
+
+
   const pagesRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(0);
   const [width, setWidth] = useState(0);
@@ -137,7 +245,7 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
           const page = await document_.getPage(number);
           if (cancelled) return;
           const baseViewport = page.getViewport({ scale: 1 });
-          const cssScale = ((width - 16) / baseViewport.width) * zoom;
+          const cssScale = ((width - (immersive ? 0 : 16)) / baseViewport.width) * zoom;
           const viewport = page.getViewport({ scale: cssScale * pixelRatio });
 
           const canvas = window.document.createElement('canvas');
@@ -167,7 +275,7 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
       cancelled = true;
       destroy?.();
     };
-  }, [data, width, zoom, title, attempt]);
+  }, [data, width, zoom, title, attempt, immersive]);
 
   // Ob es etwas zu scrollen gibt, ändert sich mit jeder nachgeladenen Seite, mit Zoom und Bildschirmgröße –
   // deshalb wird die Größe der Seiten laufend beobachtet.
@@ -206,6 +314,7 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
       onClose={onClose}
       size="full"
       layer="top"
+      hideHeader={immersive}
       headerExtra={
         <div className="flex items-center gap-1">
           {pageCount > 1 && <span className="hidden px-2 text-sm text-stage-muted sm:inline">{pageCount} Seiten</span>}
@@ -216,11 +325,26 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
             disabled={zoomIndex === ZOOM_STEPS.length - 1}
             onClick={() => setZoomIndex(zoomIndex + 1)}
           />
+          <IconButton icon={Maximize} label="PDF im Vollbild" onClick={() => setImmersive(true)} />
         </div>
       }
     >
-      <div className="relative h-full">
-      <div ref={scrollerRef} className="h-full overflow-auto bg-stage-bg p-2 pb-28">
+      <div className="relative h-full" onPointerDown={showControls}>
+      {immersive && (
+        <div
+          className={`absolute right-0 top-0 z-10 flex gap-1 p-2 pt-[calc(0.5rem+env(safe-area-inset-top))] transition-opacity duration-300 ${
+            controlsShown ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+        >
+          <div className="theme-dark flex items-center gap-1 rounded-full border border-white/10 bg-black/70 p-1 text-stage-text shadow-pop backdrop-blur">
+            <IconButton icon={ZoomOut} label="Verkleinern" disabled={zoomIndex === 0} onClick={() => setZoomIndex(zoomIndex - 1)} className="rounded-full" />
+            <IconButton icon={ZoomIn} label="Vergrößern" disabled={zoomIndex === ZOOM_STEPS.length - 1} onClick={() => setZoomIndex(zoomIndex + 1)} className="rounded-full" />
+            <IconButton icon={Minimize} label="Vollbild beenden" onClick={() => setImmersive(false)} className="rounded-full" />
+            <IconButton icon={X} label="Schließen" onClick={onClose} className="rounded-full" />
+          </div>
+        </div>
+      )}
+      <div ref={scrollerRef} className={`h-full overflow-auto pb-28 ${immersive ? 'bg-neutral-950' : 'bg-stage-bg p-2'}`}>
         <div ref={pagesRef} className="flex w-max min-w-full flex-col gap-2" />
 
         {!missing && status === 'loading' && (
@@ -266,7 +390,11 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
       </div>
 
       {status === 'ready' && !missing && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div
+          className={`pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] transition-opacity duration-300 ${
+            controlsShown ? 'opacity-100' : 'opacity-0 [&_*]:!pointer-events-none'
+          }`}
+        >
           <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-stage-line bg-stage-surface/95 p-1.5 shadow-pop backdrop-blur" role="group" aria-label="Automatischer Bildlauf">
             <IconButton
               icon={Minus}

@@ -118,6 +118,8 @@ interface ModalProps {
   /** Bestätigungsdialoge liegen über allen anderen Ebenen. */
   layer?: 'default' | 'top';
   headerExtra?: ReactNode;
+  /** Kopfleiste ausblenden (Vollbild); der Titel bleibt für Screenreader erhalten. */
+  hideHeader?: boolean;
 }
 
 const MODAL_SIZES = {
@@ -126,7 +128,7 @@ const MODAL_SIZES = {
   full: '',
 };
 
-export function Modal({ title, subtitle, onClose, children, size = 'lg', layer = 'default', headerExtra }: ModalProps) {
+export function Modal({ title, subtitle, onClose, children, size = 'lg', layer = 'default', headerExtra, hideHeader = false }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -167,16 +169,22 @@ export function Modal({ title, subtitle, onClose, children, size = 'lg', layer =
         tabIndex={-1}
         className={`flex h-full w-full flex-col overflow-hidden border-stage-line bg-stage-surface outline-none pt-safe pb-safe ${MODAL_SIZES[size]}`}
       >
-        <header className="flex shrink-0 items-center gap-2 border-b border-stage-line py-2 pl-5 pr-2">
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="truncate text-base font-semibold sm:text-lg">
-              {title}
-            </h2>
-            {subtitle && <p className="truncate text-sm text-stage-muted">{subtitle}</p>}
-          </div>
-          {headerExtra}
-          <IconButton icon={X} label="Schließen" onClick={onClose} />
-        </header>
+        {hideHeader ? (
+          <h2 id={titleId} className="sr-only">
+            {title}
+          </h2>
+        ) : (
+          <header className="flex shrink-0 items-center gap-2 border-b border-stage-line py-2 pl-5 pr-2">
+            <div className="min-w-0 flex-1">
+              <h2 id={titleId} className="truncate text-base font-semibold sm:text-lg">
+                {title}
+              </h2>
+              {subtitle && <p className="truncate text-sm text-stage-muted">{subtitle}</p>}
+            </div>
+            {headerExtra}
+            <IconButton icon={X} label="Schließen" onClick={onClose} />
+          </header>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
