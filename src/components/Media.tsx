@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Download,
+  Drum,
   Eye,
   File,
   FilePen,
@@ -239,16 +240,20 @@ interface LeadsheetEntry {
   setlists: { name: string; status: string }[];
 }
 
-function LeadsheetRow({ entry, onOpen }: { entry: LeadsheetEntry; onOpen: () => void }) {
+type SongPdfKind = 'leadsheet' | 'drum';
+const SONG_PDF_LABEL: Record<SongPdfKind, string> = { leadsheet: 'Leadsheet', drum: 'Drum Sheet' };
+
+function LeadsheetRow({ entry, kind, onOpen }: { entry: LeadsheetEntry; kind: SongPdfKind; onOpen: () => void }) {
   const { song, setlists } = entry;
+  const Icon = kind === 'drum' ? Drum : FileText;
   const download = async () => {
-    const pdf = await db.pdfs.get(song.id);
+    const pdf = await (kind === 'drum' ? db.drumSheets : db.pdfs).get(song.id);
     if (pdf) downloadBlob(new Blob([pdf.data], { type: 'application/pdf' }), pdf.name);
   };
   return (
     <li className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-        <FileText className="h-5 w-5" aria-hidden />
+        <Icon className="h-5 w-5" aria-hidden />
       </span>
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 py-1 text-left">
         <span className="block truncate font-semibold">{song.title}</span>
@@ -266,13 +271,13 @@ function LeadsheetRow({ entry, onOpen }: { entry: LeadsheetEntry; onOpen: () => 
           )}
         </span>
       </button>
-      <IconButton icon={Eye} label={`Leadsheet „${song.title}“ ansehen`} onClick={onOpen} />
-      <IconButton icon={Download} label={`Leadsheet „${song.title}“ herunterladen`} onClick={download} />
+      <IconButton icon={Eye} label={`${SONG_PDF_LABEL[kind]} „${song.title}“ ansehen`} onClick={onOpen} />
+      <IconButton icon={Download} label={`${SONG_PDF_LABEL[kind]} „${song.title}“ herunterladen`} onClick={download} />
     </li>
   );
 }
 
-type Filter = 'alle' | 'leadsheets' | string;
+type Filter = 'alle' | 'leadsheets' | 'drumsheets' | string;
 
 export function Media() {
   const { isAdmin } = useAdmin();
@@ -284,26 +289,29 @@ export function Media() {
   const [search, setSearch] = useState('');
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [openDoc, setOpenDoc] = useState<BandDocument | null>(null);
-  const [openSong, setOpenSong] = useState<Song | null>(null);
+  const [openSong, setOpenSong] = useState<{ song: Song; kind: SongPdfKind } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const leadsheets = useMemo<LeadsheetEntry[]>(() => {
-    if (!songs || !setlists) return [];
-    return songs
-      .filter((song) => song.pdfName)
-      .sort((a, b) => a.title.localeCompare(b.title, 'de'))
-      .map((song) => ({
-        song,
-        setlists: setlists.filter((setlist) => setlist.songIds.includes(song.id)).map((setlist) => ({ name: setlist.name, status: statusOf(setlist, song.id) })),
-      }));
+  const songPdfs = useMemo(() => {
+    const entries = (has: (song: Song) => boolean): LeadsheetEntry[] =>
+      (songs ?? [])
+        .filter(has)
+        .sort((a, b) => a.title.localeCompare(b.title, 'de'))
+        .map((song) => ({
+          song,
+          setlists: (setlists ?? []).filter((setlist) => setlist.songIds.includes(song.id)).map((setlist) => ({ name: setlist.name, status: statusOf(setlist, song.id) })),
+        }));
+    return { leadsheets: entries((song) => Boolean(song.pdfName)), drumSheets: entries((song) => Boolean(song.drumSheetName)) };
   }, [songs, setlists]);
+  const { leadsheets, drumSheets } = songPdfs;
 
   if (!documents || !songs || !setlists) return null;
 
   const term = search.trim().toLocaleLowerCase('de');
   const matches = (text: string) => !term || text.toLocaleLowerCase('de').includes(term);
-  const shownDocs = filter === 'leadsheets' ? [] : documents.filter((doc) => (filter === 'alle' || doc.category === filter) && matches(`${doc.title} ${doc.fileName}`));
+  const shownDocs = filter === 'leadsheets' || filter === 'drumsheets' ? [] : documents.filter((doc) => (filter === 'alle' || doc.category === filter) && matches(`${doc.title} ${doc.fileName}`));
   const shownLeadsheets = filter === 'alle' || filter === 'leadsheets' ? leadsheets.filter(({ song }) => matches(`${song.title} ${song.artist}`)) : [];
+  const shownDrumSheets = filter === 'alle' || filter === 'drumsheets' ? drumSheets.filter(({ song }) => matches(`${song.title} ${song.artist}`)) : [];
   const usedCategories = DOCUMENT_CATEGORIES.filter(({ id }) => documents.some((doc) => doc.category === id));
 
   const pickFile = (file: File | undefined) => {
@@ -322,16 +330,17 @@ export function Media() {
   };
 
   const chips: { id: Filter; label: string; count: number }[] = [
-    { id: 'alle', label: 'Alle', count: documents.length + leadsheets.length },
+    { id: 'alle', label: 'Alle', count: documents.length + leadsheets.length + drumSheets.length },
     ...usedCategories.map(({ id, label }) => ({ id, label, count: documents.filter((doc) => doc.category === id).length })),
     { id: 'leadsheets', label: 'Leadsheets', count: leadsheets.length },
+    { id: 'drumsheets', label: 'Drum Sheets', count: drumSheets.length },
   ];
 
   return (
     <section>
       <PageHeader
         title="Medien"
-        description="Band-Dokumente wie Rider, Angebot oder Pressetext – und alle Leadsheets aus den Songs."
+        description="Band-Dokumente wie Rider, Angebot oder Pressetext – und alle Leadsheets und Drum Sheets aus den Songs."
         action={
           isAdmin && (
             <>
@@ -367,7 +376,7 @@ export function Media() {
         </div>
       </div>
 
-      {filter !== 'leadsheets' && (
+      {filter !== 'leadsheets' && filter !== 'drumsheets' && (
         <div className="mb-8">
           <SectionTitle>Band-Dokumente</SectionTitle>
           {shownDocs.length > 0 ? (
@@ -394,12 +403,29 @@ export function Media() {
           {shownLeadsheets.length > 0 ? (
             <ul className="card divide-y divide-stage-line">
               {shownLeadsheets.map((entry) => (
-                <LeadsheetRow key={entry.song.id} entry={entry} onOpen={() => setOpenSong(entry.song)} />
+                <LeadsheetRow key={entry.song.id} entry={entry} kind="leadsheet" onOpen={() => setOpenSong({ song: entry.song, kind: 'leadsheet' })} />
               ))}
             </ul>
           ) : (
             <EmptyState icon={FileText} title={leadsheets.length === 0 ? 'Noch keine Leadsheets' : 'Nichts gefunden'}>
               {leadsheets.length === 0 ? 'PDFs hängst du im Bereich „Songs“ direkt an einen Song an.' : 'Probiere einen anderen Suchbegriff.'}
+            </EmptyState>
+          )}
+        </div>
+      )}
+
+      {(filter === 'alle' || filter === 'drumsheets') && (
+        <div className="mt-8">
+          <SectionTitle>Drum Sheets aus den Songs</SectionTitle>
+          {shownDrumSheets.length > 0 ? (
+            <ul className="card divide-y divide-stage-line">
+              {shownDrumSheets.map((entry) => (
+                <LeadsheetRow key={entry.song.id} entry={entry} kind="drum" onOpen={() => setOpenSong({ song: entry.song, kind: 'drum' })} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon={Drum} title={drumSheets.length === 0 ? 'Noch keine Drum Sheets' : 'Nichts gefunden'}>
+              {drumSheets.length === 0 ? 'Drum Sheets lädt der Admin im Bereich „Songs“ beim jeweiligen Song hoch – genau wie Leadsheets.' : 'Probiere einen anderen Suchbegriff.'}
             </EmptyState>
           )}
         </div>
@@ -416,7 +442,14 @@ export function Media() {
       {editor && <DocumentEditor state={editor} onClose={() => setEditor(null)} />}
       {openDoc && isPdf(openDoc) && <PdfModal title={openDoc.title} file={{ name: openDoc.fileName, data: openDoc.data }} onClose={() => setOpenDoc(null)} />}
       {openDoc && !isPdf(openDoc) && <ImagePreview doc={openDoc} onClose={() => setOpenDoc(null)} />}
-      {openSong && <PdfViewer songId={openSong.id} title={openSong.title} onClose={() => setOpenSong(null)} />}
+      {openSong && (
+        <PdfViewer
+          songId={openSong.song.id}
+          title={openSong.kind === 'drum' ? `${openSong.song.title} · Drum Sheet` : openSong.song.title}
+          source={openSong.kind}
+          onClose={() => setOpenSong(null)}
+        />
+      )}
     </section>
   );
 }

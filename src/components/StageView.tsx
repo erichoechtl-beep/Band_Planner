@@ -5,6 +5,7 @@ import {
   CircleCheck,
   CircleHelp,
   CircleMinus,
+  Drum,
   FileText,
   ListOrdered,
   Lock,
@@ -178,7 +179,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
   const [index, setIndex] = useState(initialIndex);
   // Transposition je Song merken, damit sie beim Vor- und Zurückblättern erhalten bleibt.
   const [transpositions, setTranspositions] = useState<Record<string, number>>({});
-  const [panel, setPanel] = useState<'pdf' | 'chords' | 'notes' | 'list' | null>(null);
+  const [panel, setPanel] = useState<'pdf' | 'drum' | 'notes' | 'list' | null>(null);
 
   useWakeLock();
   const fullscreen = useFullscreen();
@@ -361,8 +362,9 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
                 <span className="lg:hidden">{song.pdfName ? 'Leadsheet' : 'Kein PDF'}</span>
                 <span className="hidden lg:inline">{song.pdfName ? 'PDF-Leadsheet' : 'Kein PDF'}</span>
               </Button>
-              <Button icon={Music2} className="min-h-14 px-2 text-base lg:justify-start lg:px-5" disabled={!song.chords} onClick={() => setPanel('chords')}>
-                Akkorde
+              <Button icon={Drum} className="min-h-14 px-2 text-base lg:justify-start lg:px-5" disabled={!song.drumSheetName} onClick={() => setPanel('drum')} aria-label={song.drumSheetName ? 'Drum Sheet' : 'Kein Drum Sheet'}>
+                <span className="lg:hidden">{song.drumSheetName ? 'Drums' : 'Keine Drums'}</span>
+                <span className="hidden lg:inline">{song.drumSheetName ? 'Drum Sheet' : 'Kein Drum Sheet'}</span>
               </Button>
               <Button icon={StickyNote} className="min-h-14 px-2 text-base lg:justify-start lg:px-5" onClick={() => setPanel('notes')}>
                 Notiz{notes && notes.length > 0 ? ` (${notes.length})` : ''}
@@ -429,10 +431,14 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
 
       {panel === 'pdf' && <PdfViewer songId={song.id} title={song.title} durationSeconds={parseDuration(song.duration)} onClose={() => setPanel(null)} />}
 
-      {panel === 'chords' && (
-        <Modal title={song.title} subtitle={`Akkorde${semitones !== 0 ? ` · ${shown.key}` : ''}`} onClose={() => setPanel(null)} size="full">
-          <pre className="p-5 font-mono text-xl leading-relaxed sm:p-8 sm:text-3xl">{shown.chords}</pre>
-        </Modal>
+      {panel === 'drum' && (
+        <PdfViewer
+          songId={song.id}
+          title={`${song.title} · Drum Sheet`}
+          source="drum"
+          durationSeconds={parseDuration(song.duration)}
+          onClose={() => setPanel(null)}
+        />
       )}
 
       {panel === 'notes' && (

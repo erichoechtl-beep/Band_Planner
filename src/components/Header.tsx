@@ -10,7 +10,7 @@ export type TabId = 'start' | 'setlists' | 'songs' | 'termine' | 'medien' | 'syn
 export const TABS: { id: TabId; label: string; short: string; description: string; icon: LucideIcon }[] = [
   { id: 'start', label: 'Start', short: 'Start', description: 'Überblick: nächster Termin und Setlist', icon: House },
   { id: 'setlists', label: 'Setlists', short: 'Setlists', description: 'Konzertabläufe planen und spielen', icon: ListMusic },
-  { id: 'songs', label: 'Songs & PDFs', short: 'Songs', description: 'Repertoire, Akkorde und Leadsheets', icon: Music },
+  { id: 'songs', label: 'Songs & PDFs', short: 'Songs', description: 'Repertoire, Leadsheets und Drum Sheets', icon: Music },
   { id: 'termine', label: 'Termine', short: 'Termine', description: 'Proben und Konzerte im Kalender', icon: CalendarDays },
   { id: 'medien', label: 'Medien', short: 'Medien', description: 'Rider, Angebote, Pressetexte und Leadsheets', icon: FolderOpen },
   { id: 'sync', label: 'Daten-Sync', short: 'Sync', description: 'Band-Stand laden, exportieren, importieren', icon: Database },

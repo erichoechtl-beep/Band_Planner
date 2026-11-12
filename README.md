@@ -1,6 +1,6 @@
 # Band Planner
 
-Offline-First-PWA für Musikproben und Live-Auftritte: Startseite mit Überblick, Setlists mit Song-Status, Songs mit PDF-Leadsheets, Transponierer, Terminkalender für Proben und Konzerte, Medien (Rider, Angebote, Pressetexte) und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
+Offline-First-PWA für Musikproben und Live-Auftritte: Startseite mit Überblick, Setlists mit Song-Status, Songs mit PDF-Leadsheets und Drum Sheets, Transponierer, Terminkalender für Proben und Konzerte, Medien (Rider, Angebote, Pressetexte) und persönliche Notizen. Alles läuft ohne Server und ohne Internet direkt auf dem Gerät.
 
 ## Architektur & Funktionsweise
 
@@ -104,6 +104,7 @@ Beim ersten Öffnen mit Internet holt sich das Gerät automatisch den aktuellen 
 ## Bedienhinweise
 
 - **Termine:** Im Reiter **Termine** trägt der Admin Proben (blau) und Konzerte (orange) ein: Datum, optional Uhrzeit, Bezeichnung (z. B. „Adventmarkt“), Ort und Notiz. Zum Anlegen auf **Termin hinzufügen** tippen oder einen Tag im Kalender wählen, zum Ändern oder Löschen auf den Termin tippen. Termine stecken in der band-data.json und werden wie alles andere verteilt.
+- **Drum Sheets:** Jeder Song kann neben dem Leadsheet ein zweites PDF für den Drummer haben. Hochladen im Song-Editor unter „Leadsheet & Drum Sheet“; aufrufen in der Probeansicht (Knopf „Drums“, mit Auto-Scroll), in den Song-Details und unter **Medien**. Akkord-Texte werden nicht mehr gepflegt.
 - **Lead Vocals:** Bei jedem Song lässt sich auswählen, wer singt (Benji, Marc, Eric). Die Namen stehen in `src/config.ts`, ebenso der Bandname in der Kopfzeile.
 - **Song-Status in der Setlist:** Jeder Song hat einen Status: **Fix in Setlist**, **In Abklärung** oder **Nicht in Setlist**. Der Admin ändert ihn über den Status-Knopf rechts in der Zeile; dort lässt sich ein Song auch ganz entfernen. Die Probeansicht spielt erst alle fixen Songs, danach die in Abklärung (markiert); „Nicht in Setlist“ erscheint dort nicht. Die Gesamtdauer zählt nur fixe Songs.
 - **Persönliche Notizen:** Der kleine Zettel in jeder Setlist-Zeile leuchtet gelb, wenn es eine eigene Notiz gibt. Antippen öffnet die Notiz – das geht für alle, auch im Bühnen-Modus. Notizen bleiben auf dem Gerät.

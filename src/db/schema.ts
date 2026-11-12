@@ -23,6 +23,8 @@ export interface Song {
   chords: string;
   /** Dateiname des verknüpften PDFs; die Binärdaten liegen getrennt in `pdfs`. */
   pdfName: string | null;
+  /** Dateiname des Drum Sheets (PDF für den Drummer); die Daten liegen in `drumSheets`. */
+  drumSheetName: string | null;
 }
 
 /** fix = fest eingeplant, offen = in Abklärung, raus = steht zur Wahl, ist aber nicht in der Setlist */
@@ -116,8 +118,10 @@ export const BAND_DATA_FORMAT = 'band-planner';
 export const BAND_DATA_VERSION = 1;
 export const BAND_DATA_FILE_NAME = 'band-data.json';
 
-export interface SongFile extends Omit<Song, 'pdfName'> {
+export interface SongFile extends Omit<Song, 'pdfName' | 'drumSheetName'> {
   pdf: { name: string; base64: string } | null;
+  /** Fehlt in älteren Dateien. */
+  drumSheet: { name: string; base64: string } | null;
 }
 
 export interface MoodboardFile {
@@ -164,16 +168,18 @@ export function createId(): string {
 function toTableRecords(file: BandDataFile) {
   const songs: Song[] = [];
   const pdfs: SongPdf[] = [];
-  for (const { pdf, ...song } of file.songs) {
-    songs.push({ ...song, pdfName: pdf?.name ?? null });
+  const drumSheets: SongPdf[] = [];
+  for (const { pdf, drumSheet, ...song } of file.songs) {
+    songs.push({ ...song, pdfName: pdf?.name ?? null, drumSheetName: drumSheet?.name ?? null });
     if (pdf) pdfs.push({ songId: song.id, name: pdf.name, data: base64ToArrayBuffer(pdf.base64) });
+    if (drumSheet) drumSheets.push({ songId: song.id, name: drumSheet.name, data: base64ToArrayBuffer(drumSheet.base64) });
   }
   const moodboard: MoodboardItem[] = file.moodboard.map(({ base64, ...item }) => ({
     ...item,
     data: base64ToArrayBuffer(base64),
   }));
   const documents: BandDocument[] = file.documents.map(({ base64, ...item }) => ({ ...item, data: base64ToArrayBuffer(base64) }));
-  return { songs, pdfs, setlists: file.setlists, bandNames: file.bandNames, moodboard, rehearsals: file.rehearsals, documents };
+  return { songs, pdfs, drumSheets, setlists: file.setlists, bandNames: file.bandNames, moodboard, rehearsals: file.rehearsals, documents };
 }
 
 /** Befüllt eine neue, leere Datenbank mit den deutschen Start-Daten. */
@@ -181,6 +187,7 @@ async function seedDatabase(tx: Transaction): Promise<void> {
   const records = toTableRecords(SEED_BAND_DATA);
   await tx.table('songs').bulkAdd(records.songs);
   await tx.table('pdfs').bulkAdd(records.pdfs);
+  await tx.table('drumSheets').bulkAdd(records.drumSheets);
   await tx.table('setlists').bulkAdd(records.setlists);
   await tx.table('bandNames').bulkAdd(records.bandNames);
   await tx.table('moodboard').bulkAdd(records.moodboard);
@@ -202,6 +209,7 @@ class BandDatabase extends Dexie {
   bandNames!: Table<BandName, string>;
   moodboard!: Table<MoodboardItem, string>;
   pdfs!: Table<SongPdf, string>;
+  drumSheets!: Table<SongPdf, string>;
   rehearsals!: Table<Rehearsal, string>;
   documents!: Table<BandDocument, string>;
   personalNotes!: Table<PersonalNote, string>;
@@ -234,6 +242,14 @@ class BandDatabase extends Dexie {
           if (song.leadVocals === undefined) song.leadVocals = '';
         });
       });
+    // Version 5: Drum Sheets je Song (PDF für den Drummer), aufgebaut wie die Leadsheets.
+    this.version(5)
+      .stores({ drumSheets: 'songId' })
+      .upgrade(async (tx) => {
+        await tx.table('songs').toCollection().modify((song: Partial<Song>) => {
+          if (song.drumSheetName === undefined) song.drumSheetName = null;
+        });
+      });
     // „populate“ läuft genau einmal beim Anlegen der Datenbank. Löscht der Admin später
     // alle Songs, kommen die Beispieldaten also nicht zurück.
     this.on('populate', (tx) => seedDatabase(tx));
@@ -244,7 +260,7 @@ export const db = new BandDatabase();
 
 /** Alle Tabellen, die zum geteilten Band-Stand gehören. `personalNotes` fehlt hier absichtlich. */
 function bandTables() {
-  return [db.songs, db.pdfs, db.setlists, db.bandNames, db.moodboard, db.rehearsals, db.documents, db.meta];
+  return [db.songs, db.pdfs, db.drumSheets, db.setlists, db.bandNames, db.moodboard, db.rehearsals, db.documents, db.meta];
 }
 
 /** Führt eine Admin-Änderung atomar aus und merkt sich, dass sie noch nicht exportiert wurde. */
@@ -350,15 +366,8 @@ function parseSong(raw: unknown, index: number): SongFile {
     throw new BandDataError(`${label}: Das Tempo (BPM) muss eine positive Zahl sein.`);
   }
 
-  let pdf: SongFile['pdf'] = null;
-  if (raw.pdf !== undefined && raw.pdf !== null) {
-    if (!isRecord(raw.pdf)) throw new BandDataError(`${label}: Die PDF-Angabe ist ungültig.`);
-    const base64 = requireString(raw.pdf, 'base64', `${label} (PDF)`);
-    if (!looksLikePdf(decodeOrThrow(base64, `${label} (PDF)`))) {
-      throw new BandDataError(`${label}: Die eingebettete Datei ist kein PDF.`);
-    }
-    pdf = { name: requireString(raw.pdf, 'name', `${label} (PDF)`), base64 };
-  }
+  const pdf = parseEmbeddedPdf(raw.pdf, label, 'PDF');
+  const drumSheet = parseEmbeddedPdf(raw.drumSheet, label, 'Drum Sheet');
 
   return {
     id: requireString(raw, 'id', label),
@@ -372,7 +381,18 @@ function parseSong(raw: unknown, index: number): SongFile {
     structure: optionalString(raw, 'structure', label),
     chords: optionalString(raw, 'chords', label),
     pdf,
+    drumSheet,
   };
+}
+
+function parseEmbeddedPdf(raw: unknown, label: string, what: string): { name: string; base64: string } | null {
+  if (raw === undefined || raw === null) return null;
+  if (!isRecord(raw)) throw new BandDataError(`${label}: Die Angabe „${what}“ ist ungültig.`);
+  const base64 = requireString(raw, 'base64', `${label} (${what})`);
+  if (!looksLikePdf(decodeOrThrow(base64, `${label} (${what})`))) {
+    throw new BandDataError(`${label}: Das eingebettete ${what} ist kein PDF.`);
+  }
+  return { name: requireString(raw, 'name', `${label} (${what})`), base64 };
 }
 
 function parseSetlist(raw: unknown, index: number, knownSongIds: Set<string>): Setlist {
@@ -559,9 +579,10 @@ export function parseBandDataText(text: string): BandDataFile {
 /** Liest alle Band-Tabellen und verpackt sie samt Base64-Dateien. Persönliche Notizen bleiben außen vor. */
 export async function buildBandDataFile(): Promise<BandDataFile> {
   return db.transaction('r', bandTables(), async () => {
-    const [songs, pdfs, setlists, bandNames, moodboard, rehearsals, documents, textEntry, status] = await Promise.all([
+    const [songs, pdfs, drumSheets, setlists, bandNames, moodboard, rehearsals, documents, textEntry, status] = await Promise.all([
       db.songs.toArray(),
       db.pdfs.toArray(),
+      db.drumSheets.toArray(),
       db.setlists.toArray(),
       db.bandNames.toArray(),
       db.moodboard.toArray(),
@@ -571,15 +592,16 @@ export async function buildBandDataFile(): Promise<BandDataFile> {
       getBandStatus(),
     ]);
     const pdfBySong = new Map(pdfs.map((pdf) => [pdf.songId, pdf]));
+    const drumBySong = new Map(drumSheets.map((sheet) => [sheet.songId, sheet]));
+    const embed = (file: SongPdf | undefined) => (file ? { name: file.name, base64: arrayBufferToBase64(file.data) } : null);
     return {
       format: BAND_DATA_FORMAT,
       schemaVersion: BAND_DATA_VERSION,
       // Der Zeitstempel bezeichnet die letzte Änderung: Ein erneuter Export ohne Änderung
       // zählt für die Band nicht als neuer Stand.
       lastUpdated: status.bandDataUpdatedAt ?? new Date().toISOString(),
-      songs: songs.map(({ pdfName: _pdfName, ...song }) => {
-        const pdf = pdfBySong.get(song.id);
-        return { ...song, pdf: pdf ? { name: pdf.name, base64: arrayBufferToBase64(pdf.data) } : null };
+      songs: songs.map(({ pdfName: _pdfName, drumSheetName: _drumSheetName, ...song }) => {
+        return { ...song, pdf: embed(pdfBySong.get(song.id)), drumSheet: embed(drumBySong.get(song.id)) };
       }),
       setlists,
       bandNames,
@@ -633,6 +655,7 @@ export async function applyBandData(file: BandDataFile, source: string): Promise
     await Promise.all([
       db.songs.clear(),
       db.pdfs.clear(),
+      db.drumSheets.clear(),
       db.setlists.clear(),
       db.bandNames.clear(),
       db.moodboard.clear(),
@@ -641,6 +664,7 @@ export async function applyBandData(file: BandDataFile, source: string): Promise
     ]);
     await db.songs.bulkAdd(records.songs);
     await db.pdfs.bulkAdd(records.pdfs);
+    await db.drumSheets.bulkAdd(records.drumSheets);
     await db.setlists.bulkAdd(records.setlists);
     await db.bandNames.bulkAdd(records.bandNames);
     await db.moodboard.bulkAdd(records.moodboard);

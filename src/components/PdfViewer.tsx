@@ -70,12 +70,14 @@ interface PdfViewerProps {
   title: string;
   /** Songlänge in Sekunden – bestimmt das Grundtempo des automatischen Bildlaufs */
   durationSeconds?: number | null;
+  /** Welches PDF des Songs: Leadsheet (Standard) oder Drum Sheet */
+  source?: 'leadsheet' | 'drum';
   onClose: () => void;
 }
 
 /** Leadsheet eines Songs aus der lokalen Datenbank. */
-export function PdfViewer({ songId, title, durationSeconds = null, onClose }: PdfViewerProps) {
-  const pdf = useLiveQuery(() => db.pdfs.get(songId), [songId], null);
+export function PdfViewer({ songId, title, durationSeconds = null, source = 'leadsheet', onClose }: PdfViewerProps) {
+  const pdf = useLiveQuery(() => (source === 'drum' ? db.drumSheets : db.pdfs).get(songId), [songId, source], null);
   return <PdfModal title={title} file={pdf} durationSeconds={durationSeconds} onClose={onClose} />;
 }
 

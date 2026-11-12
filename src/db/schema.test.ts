@@ -432,5 +432,46 @@ describe('Termin-Art und Lead Vocals', () => {
       ['konzert', ''],
     ]);
     expect((await db.songs.get('s'))?.leadVocals).toBe('');
+    expect((await db.songs.get('s'))?.drumSheetName).toBeNull();
+  });
+});
+
+describe('Drum Sheets', () => {
+  const pdfBytes = () => Uint8Array.from(Buffer.from(cloneSeed().songs.find((song) => song.pdf)!.pdf!.base64, 'base64')).buffer as ArrayBuffer;
+
+  it('speichert, exportiert und importiert ein Drum Sheet neben dem Leadsheet', async () => {
+    const [song] = await db.songs.toArray();
+    const { id, pdfName: _p, drumSheetName: _d, ...input } = song;
+    await saveSong(id, input, { kind: 'keep' }, { kind: 'replace', name: 'drums.pdf', data: pdfBytes() });
+    expect((await db.songs.get(id))?.drumSheetName).toBe('drums.pdf');
+    expect(await db.drumSheets.count()).toBe(1);
+
+    const exported = await buildBandDataFile();
+    expect(exported.songs.find((entry) => entry.id === id)?.drumSheet?.name).toBe('drums.pdf');
+
+    await db.drumSheets.clear();
+    await applyBandData(parseBandDataText(JSON.stringify({ ...exported, lastUpdated: '2099-01-01T00:00:00.000Z' })), 'Test');
+    expect((await db.drumSheets.get(id))?.name).toBe('drums.pdf');
+    expect((await db.songs.get(id))?.drumSheetName).toBe('drums.pdf');
+  });
+
+  it('entfernt das Drum Sheet, ohne das Leadsheet anzufassen, und räumt beim Löschen auf', async () => {
+    const song = (await db.songs.toArray()).find((entry) => entry.pdfName)!;
+    const { id, pdfName: _p, drumSheetName: _d, ...input } = song;
+    await saveSong(id, input, { kind: 'keep' }, { kind: 'replace', name: 'drums.pdf', data: pdfBytes() });
+    await saveSong(id, input, { kind: 'keep' }, { kind: 'remove' });
+    expect((await db.songs.get(id))?.drumSheetName).toBeNull();
+    expect((await db.songs.get(id))?.pdfName).toBe(song.pdfName);
+    await saveSong(id, input, { kind: 'keep' }, { kind: 'replace', name: 'drums.pdf', data: pdfBytes() });
+    await deleteSong(id);
+    expect(await db.drumSheets.get(id)).toBeUndefined();
+  });
+
+  it('lehnt ein Drum Sheet ab, das kein PDF ist, und akzeptiert ältere Dateien ohne Drum Sheets', () => {
+    const file = cloneSeed() as unknown as { songs: Record<string, unknown>[] };
+    file.songs[0].drumSheet = { name: 'x.pdf', base64: Buffer.from('kein pdf').toString('base64') };
+    expect(() => parseBandData(file)).toThrow('Das eingebettete Drum Sheet ist kein PDF');
+    delete file.songs[0].drumSheet;
+    expect(parseBandData(file).songs[0].drumSheet).toBeNull();
   });
 });

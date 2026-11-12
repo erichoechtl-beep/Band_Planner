@@ -35,6 +35,7 @@ export const SEED_BAND_DATA: BandDataFile = {
         'Outro: A  E  D  A',
       ].join('\n'),
       pdf: null,
+      drumSheet: null,
     },
     {
       id: 'song-major-tom',
@@ -62,6 +63,7 @@ export const SEED_BAND_DATA: BandDataFile = {
         'C        G        F        G',
       ].join('\n'),
       pdf: null,
+      drumSheet: null,
     },
     {
       id: 'song-westerland',
@@ -88,6 +90,7 @@ export const SEED_BAND_DATA: BandDataFile = {
         'Outro: G  D  C  G',
       ].join('\n'),
       pdf: { name: 'Westerland-Leadsheet.pdf', base64: SEED_LEADSHEET_BASE64 },
+      drumSheet: null,
     },
   ],
   setlists: [

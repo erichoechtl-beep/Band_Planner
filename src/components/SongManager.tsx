@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronRight, FileText, MicVocal, Music, Pencil, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
+import { ChevronRight, Drum, FileText, MicVocal, Music, Pencil, Plus, Save, Search, Trash2, Upload, type LucideIcon } from 'lucide-react';
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { VOCALISTS } from '../config';
 import { useAdmin } from '../context/AdminContext';
@@ -25,7 +25,6 @@ interface FormState {
   leadVocals: string;
   duration: string;
   structure: string;
-  chords: string;
 }
 
 function toFormState(song: Song | null): FormState {
@@ -37,57 +36,96 @@ function toFormState(song: Song | null): FormState {
     leadVocals: song?.leadVocals ?? '',
     duration: song?.duration ?? '',
     structure: song?.structure ?? '',
-    chords: song?.chords ?? '',
   };
 }
 
 function FormSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <fieldset className="flex flex-col gap-4">
+    <fieldset className="flex min-w-0 flex-col gap-4">
       <legend className="eyebrow mb-3">{title}</legend>
       {children}
     </fieldset>
   );
 }
 
+interface PdfFieldProps {
+  label: string;
+  icon: LucideIcon;
+  currentName: string | null;
+  inputLabel: string;
+  removeLabel: string;
+  error?: string;
+  onPick: (file: File | undefined) => void;
+  onRemove: () => void;
+}
+
+/** Feld zum Hochladen, Ersetzen und Entfernen eines PDFs (Leadsheet oder Drum Sheet). */
+function PdfField({ label, icon: Icon, currentName, inputLabel, removeLabel, error, onPick, onRemove }: PdfFieldProps) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <span className="field-label">{label}</span>
+      <div className="flex items-center gap-3 rounded-lg border border-dashed border-stage-strong bg-stage-bg p-2 pl-3">
+        <Icon className={`h-5 w-5 shrink-0 ${currentName ? 'text-accent' : 'text-stage-subtle'}`} aria-hidden />
+        <span className={`min-w-0 flex-1 truncate text-sm ${currentName ? 'font-medium' : 'text-stage-muted'}`}>{currentName ?? 'Kein PDF verknüpft'}</span>
+        <input
+          ref={input}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="sr-only"
+          aria-label={inputLabel}
+          onChange={(event) => {
+            onPick(event.target.files?.[0]);
+            event.target.value = '';
+          }}
+        />
+        {currentName && <IconButton icon={Trash2} label={removeLabel} variant="danger" onClick={onRemove} />}
+        <Button icon={Upload} onClick={() => input.current?.click()}>
+          {currentName ? 'Ersetzen' : 'PDF hochladen'}
+        </Button>
+      </div>
+      {error && (
+        <p className="mt-1.5 text-sm font-medium text-danger" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Liest ein PDF ein und prüft Größe und Format; liefert die Änderung oder eine deutsche Fehlermeldung. */
+async function readPdf(file: File): Promise<PdfChange | string> {
+  if (file.size > MAX_PDF_BYTES) return `Die Datei ist mit ${formatBytes(file.size)} zu groß (maximal ${formatBytes(MAX_PDF_BYTES)}).`;
+  try {
+    const data = await file.arrayBuffer();
+    if (!looksLikePdf(data)) return `„${file.name}“ ist keine gültige PDF-Datei.`;
+    return { kind: 'replace', name: file.name, data };
+  } catch {
+    return 'Die Datei konnte nicht gelesen werden.';
+  }
+}
+
+const nameAfter = (change: PdfChange, previous: string | null) => (change.kind === 'replace' ? change.name : change.kind === 'remove' ? null : previous);
+
 function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void }) {
   const { toast } = useFeedback();
   const [form, setForm] = useState<FormState>(() => toFormState(song));
   const [pdfChange, setPdfChange] = useState<PdfChange>({ kind: 'keep' });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'pdf', string>>>({});
+  const [drumChange, setDrumChange] = useState<PdfChange>({ kind: 'keep' });
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'pdf' | 'drum', string>>>({});
   const [saving, setSaving] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const update = (field: keyof FormState) => (event: { target: { value: string } }) => {
     setForm((current) => ({ ...current, [field]: event.target.value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const currentPdfName =
-    pdfChange.kind === 'replace' ? pdfChange.name : pdfChange.kind === 'remove' ? null : song?.pdfName ?? null;
-
-  const handlePdf = async (file: File | undefined) => {
+  const pick = (field: 'pdf' | 'drum', apply: (change: PdfChange) => void) => async (file: File | undefined) => {
     if (!file) return;
-    setErrors((current) => ({ ...current, pdf: undefined }));
-    try {
-      if (file.size > MAX_PDF_BYTES) {
-        setErrors((current) => ({
-          ...current,
-          pdf: `Die Datei ist mit ${formatBytes(file.size)} zu groß (maximal ${formatBytes(MAX_PDF_BYTES)}).`,
-        }));
-        return;
-      }
-      const data = await file.arrayBuffer();
-      if (!looksLikePdf(data)) {
-        setErrors((current) => ({ ...current, pdf: `„${file.name}“ ist keine gültige PDF-Datei.` }));
-        return;
-      }
-      setPdfChange({ kind: 'replace', name: file.name, data });
-    } catch {
-      setErrors((current) => ({ ...current, pdf: 'Die Datei konnte nicht gelesen werden.' }));
-    } finally {
-      if (fileInput.current) fileInput.current.value = '';
-    }
+    const result = await readPdf(file);
+    if (typeof result === 'string') return setErrors((current) => ({ ...current, [field]: result }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+    apply(result);
   };
 
   const submit = async (event: FormEvent) => {
@@ -113,9 +151,11 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
           leadVocals: form.leadVocals,
           duration: form.duration.trim(),
           structure: form.structure.trim(),
-          chords: form.chords.replace(/\s+$/, ''),
+          // Akkorde werden nicht mehr gepflegt; vorhandene bleiben unverändert erhalten.
+          chords: song?.chords ?? '',
         },
         pdfChange,
+        drumChange,
       );
       toast(song ? 'Song gespeichert.' : 'Song angelegt.');
       onClose();
@@ -207,43 +247,27 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
           </div>
         </FormSection>
 
-        <FormSection title="Akkorde & Leadsheet">
-          <div>
-            <label className="field-label" htmlFor="song-chords">
-              Akkorde / Text
-            </label>
-            <textarea
-              id="song-chords"
-              className="field min-h-48 font-mono text-sm leading-relaxed"
-              value={form.chords}
-              onChange={update('chords')}
-              spellCheck={false}
-              placeholder={'[Strophe]\nAm       F        C        G\n\nOder inline: [Am]Text [F]weiter'}
-            />
-          </div>
-
-          <div>
-            <span className="field-label">PDF-Leadsheet</span>
-            <div className="flex items-center gap-3 rounded-lg border border-dashed border-stage-strong bg-stage-bg p-2 pl-3">
-              <FileText className={`h-5 w-5 shrink-0 ${currentPdfName ? 'text-accent' : 'text-stage-subtle'}`} aria-hidden />
-              <span className={`min-w-0 flex-1 truncate text-sm ${currentPdfName ? 'font-medium' : 'text-stage-muted'}`}>
-                {currentPdfName ?? 'Kein PDF verknüpft'}
-              </span>
-              <input
-                ref={fileInput}
-                type="file"
-                accept="application/pdf,.pdf"
-                className="sr-only"
-                aria-label="PDF-Datei auswählen"
-                onChange={(event) => handlePdf(event.target.files?.[0])}
-              />
-              {currentPdfName && <IconButton icon={Trash2} label="PDF entfernen" variant="danger" onClick={() => setPdfChange({ kind: 'remove' })} />}
-              <Button icon={Upload} onClick={() => fileInput.current?.click()}>
-                {currentPdfName ? 'Ersetzen' : 'PDF hochladen'}
-              </Button>
-            </div>
-            {fieldError('pdf')}
-          </div>
+        <FormSection title="Leadsheet & Drum Sheet">
+          <PdfField
+            label="PDF-Leadsheet"
+            icon={FileText}
+            currentName={nameAfter(pdfChange, song?.pdfName ?? null)}
+            inputLabel="PDF-Datei auswählen"
+            removeLabel="PDF entfernen"
+            error={errors.pdf}
+            onPick={pick('pdf', setPdfChange)}
+            onRemove={() => setPdfChange({ kind: 'remove' })}
+          />
+          <PdfField
+            label="Drum Sheet"
+            icon={Drum}
+            currentName={nameAfter(drumChange, song?.drumSheetName ?? null)}
+            inputLabel="Drum-Sheet-Datei auswählen"
+            removeLabel="Drum Sheet entfernen"
+            error={errors.drum}
+            onPick={pick('drum', setDrumChange)}
+            onRemove={() => setDrumChange({ kind: 'remove' })}
+          />
         </FormSection>
 
         <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end gap-2 border-t border-stage-line bg-stage-surface px-5 py-4">
@@ -272,13 +296,13 @@ function SongDetails({ song, onClose, onEdit }: { song: Song; onClose: () => voi
   const { isAdmin } = useAdmin();
   const { toast, confirm } = useFeedback();
   const [semitones, setSemitones] = useState(0);
-  const [showPdf, setShowPdf] = useState(false);
+  const [showPdf, setShowPdf] = useState<'leadsheet' | 'drum' | null>(null);
   const shown = useMemo(() => transposeSong(song, semitones), [song, semitones]);
 
   const remove = async () => {
     const confirmed = await confirm({
       title: 'Song löschen?',
-      message: `„${song.title}“ wird samt PDF aus den Band-Daten und allen Setlists entfernt. Persönliche Notizen bleiben erhalten.`,
+      message: `„${song.title}“ wird samt PDFs aus den Band-Daten und allen Setlists entfernt. Persönliche Notizen bleiben erhalten.`,
       confirmLabel: 'Song löschen',
       danger: true,
     });
@@ -307,24 +331,25 @@ function SongDetails({ song, onClose, onEdit }: { song: Song; onClose: () => voi
           <Stat label="Dauer" value={song.duration || '–'} />
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <TransposeTool semitones={semitones} originalKey={song.key} transposedKey={shown.key} onChange={setSemitones} />
-          {song.pdfName && (
-            <Button variant="accent" icon={FileText} onClick={() => setShowPdf(true)} className="sm:h-auto">
-              PDF-Leadsheet öffnen
-            </Button>
-          )}
-        </div>
+        <TransposeTool semitones={semitones} originalKey={song.key} transposedKey={shown.key} onChange={setSemitones} />
+        {(song.pdfName || song.drumSheetName) && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {song.pdfName && (
+              <Button variant="accent" icon={FileText} onClick={() => setShowPdf('leadsheet')}>
+                PDF-Leadsheet öffnen
+              </Button>
+            )}
+            {song.drumSheetName && (
+              <Button icon={Drum} onClick={() => setShowPdf('drum')}>
+                Drum Sheet öffnen
+              </Button>
+            )}
+          </div>
+        )}
 
         {shown.structure && (
           <DetailSection title="Song-Ablauf">
             <StructureFlow structure={shown.structure} />
-          </DetailSection>
-        )}
-
-        {shown.chords && (
-          <DetailSection title="Akkorde">
-            <pre className="overflow-x-auto rounded-xl border border-stage-line bg-stage-bg p-4 font-mono text-[15px] leading-relaxed">{shown.chords}</pre>
           </DetailSection>
         )}
 
@@ -344,7 +369,14 @@ function SongDetails({ song, onClose, onEdit }: { song: Song; onClose: () => voi
         )}
       </div>
 
-      {showPdf && <PdfViewer songId={song.id} title={song.title} onClose={() => setShowPdf(false)} />}
+      {showPdf && (
+        <PdfViewer
+          songId={song.id}
+          title={showPdf === 'drum' ? `${song.title} · Drum Sheet` : song.title}
+          source={showPdf}
+          onClose={() => setShowPdf(null)}
+        />
+      )}
     </Modal>
   );
 }
@@ -368,12 +400,13 @@ export function SongManager() {
   // Bei einem Sync kann der geöffnete Song verschwinden; der Dialog schließt sich dann von selbst.
   const selected = songs.find((song) => song.id === selectedId) ?? null;
   const pdfCount = songs.filter((song) => song.pdfName).length;
+  const drumCount = songs.filter((song) => song.drumSheetName).length;
 
   return (
     <section>
       <PageHeader
         title="Songs & PDFs"
-        description={songs.length > 0 ? `${songs.length} Songs im Repertoire · ${pdfCount} mit Leadsheet` : 'Repertoire mit Tonart, Tempo, Ablauf und Leadsheets.'}
+        description={songs.length > 0 ? `${songs.length} Songs im Repertoire · ${pdfCount} mit Leadsheet · ${drumCount} mit Drum Sheet` : 'Repertoire mit Tonart, Tempo, Ablauf und Leadsheets.'}
         action={
           isAdmin && (
             <Button variant="primary" icon={Plus} onClick={() => setEditor({ song: null })}>
@@ -426,6 +459,7 @@ export function SongManager() {
                     <span className="flex items-center gap-2">
                       <span className="truncate font-medium">{song.title}</span>
                       {song.pdfName && <FileText className="h-4 w-4 shrink-0 text-accent" aria-label="mit PDF" />}
+                      {song.drumSheetName && <Drum className="h-4 w-4 shrink-0 text-accent" aria-label="mit Drum Sheet" />}
                     </span>
                     {song.artist && <span className="block truncate text-sm text-stage-muted">{song.artist}</span>}
                     <span className="mt-1.5 flex flex-wrap gap-1.5 sm:hidden">

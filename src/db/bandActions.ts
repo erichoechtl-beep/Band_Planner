@@ -7,13 +7,13 @@ function pruneStatus(setlist: Setlist): void {
   for (const id of Object.keys(setlist.songStatus)) if (!keep.has(id)) delete setlist.songStatus[id];
 }
 
-export type SongInput = Omit<Song, 'id' | 'pdfName'>;
+export type SongInput = Omit<Song, 'id' | 'pdfName' | 'drumSheetName'>;
 
 export type PdfChange = { kind: 'keep' } | { kind: 'remove' } | { kind: 'replace'; name: string; data: ArrayBuffer };
 
-async function applyPdfChange(songId: string, change: PdfChange): Promise<void> {
-  if (change.kind === 'remove') await db.pdfs.delete(songId);
-  if (change.kind === 'replace') await db.pdfs.put({ songId, name: change.name, data: change.data });
+async function applyPdfChange(table: typeof db.pdfs, songId: string, change: PdfChange): Promise<void> {
+  if (change.kind === 'remove') await table.delete(songId);
+  if (change.kind === 'replace') await table.put({ songId, name: change.name, data: change.data });
 }
 
 function pdfNameAfter(change: PdfChange, previous: string | null): string | null {
@@ -22,12 +22,19 @@ function pdfNameAfter(change: PdfChange, previous: string | null): string | null
   return previous;
 }
 
-export function saveSong(id: string | null, input: SongInput, pdf: PdfChange): Promise<string> {
+/** Speichert einen Song samt Leadsheet- und Drum-Sheet-Änderung in einem Schritt. */
+export function saveSong(id: string | null, input: SongInput, pdf: PdfChange, drumSheet: PdfChange = { kind: 'keep' }): Promise<string> {
   return bandWrite(async () => {
     const songId = id ?? createId();
     const previous = id ? await db.songs.get(id) : undefined;
-    await db.songs.put({ ...input, id: songId, pdfName: pdfNameAfter(pdf, previous?.pdfName ?? null) });
-    await applyPdfChange(songId, pdf);
+    await db.songs.put({
+      ...input,
+      id: songId,
+      pdfName: pdfNameAfter(pdf, previous?.pdfName ?? null),
+      drumSheetName: pdfNameAfter(drumSheet, previous?.drumSheetName ?? null),
+    });
+    await applyPdfChange(db.pdfs, songId, pdf);
+    await applyPdfChange(db.drumSheets, songId, drumSheet);
     return songId;
   });
 }
@@ -37,6 +44,7 @@ export function deleteSong(id: string): Promise<void> {
   return bandWrite(async () => {
     await db.songs.delete(id);
     await db.pdfs.delete(id);
+    await db.drumSheets.delete(id);
     await db.setlists.toCollection().modify((setlist) => {
       setlist.songIds = setlist.songIds.filter((songId) => songId !== id);
       pruneStatus(setlist);
