@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronRight, Drum, FileText, MicVocal, Music, Pencil, Plus, Save, Search, Trash2, Upload, type LucideIcon } from 'lucide-react';
+import { ChevronRight, Drum, FileText, Loader2, MicVocal, Music, Pencil, Plus, Save, Search, Trash2, Upload, type LucideIcon } from 'lucide-react';
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { VOCALISTS } from '../config';
 import { useAdmin } from '../context/AdminContext';
@@ -7,6 +7,7 @@ import { useFeedback } from '../context/FeedbackContext';
 import { deleteSong, saveSong, type PdfChange } from '../db/bandActions';
 import { db, describeError, type Song } from '../db/schema';
 import { formatBytes, looksLikePdf } from '../lib/files';
+import { imagesToPdf, isImageFile } from '../lib/imagesToPdf';
 import { isValidDuration } from '../lib/time';
 import { transposeSong } from '../lib/transpose';
 import { PdfViewer } from './PdfViewer';
@@ -55,35 +56,40 @@ interface PdfFieldProps {
   inputLabel: string;
   removeLabel: string;
   error?: string;
-  onPick: (file: File | undefined) => void;
+  busy?: boolean;
+  onPick: (files: File[]) => void;
   onRemove: () => void;
 }
 
-/** Feld zum Hochladen, Ersetzen und Entfernen eines PDFs (Leadsheet oder Drum Sheet). */
-function PdfField({ label, icon: Icon, currentName, inputLabel, removeLabel, error, onPick, onRemove }: PdfFieldProps) {
+/** Feld zum Hochladen, Ersetzen und Entfernen eines Sheets – als PDF oder als Foto(s). */
+function PdfField({ label, icon: Icon, currentName, inputLabel, removeLabel, error, busy = false, onPick, onRemove }: PdfFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <div>
       <span className="field-label">{label}</span>
       <div className="flex items-center gap-3 rounded-lg border border-dashed border-stage-strong bg-stage-bg p-2 pl-3">
         <Icon className={`h-5 w-5 shrink-0 ${currentName ? 'text-accent' : 'text-stage-subtle'}`} aria-hidden />
-        <span className={`min-w-0 flex-1 truncate text-sm ${currentName ? 'font-medium' : 'text-stage-muted'}`}>{currentName ?? 'Kein PDF verknüpft'}</span>
+        <span className={`min-w-0 flex-1 truncate text-sm ${currentName ? 'font-medium' : 'text-stage-muted'}`}>
+          {busy ? 'Fotos werden umgewandelt …' : (currentName ?? 'Noch nichts hochgeladen')}
+        </span>
         <input
           ref={input}
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/pdf,.pdf,image/*"
+          multiple
           className="sr-only"
           aria-label={inputLabel}
           onChange={(event) => {
-            onPick(event.target.files?.[0]);
+            onPick(Array.from(event.target.files ?? []));
             event.target.value = '';
           }}
         />
-        {currentName && <IconButton icon={Trash2} label={removeLabel} variant="danger" onClick={onRemove} />}
-        <Button icon={Upload} onClick={() => input.current?.click()}>
-          {currentName ? 'Ersetzen' : 'PDF hochladen'}
+        {currentName && !busy && <IconButton icon={Trash2} label={removeLabel} variant="danger" onClick={onRemove} />}
+        <Button icon={busy ? Loader2 : Upload} disabled={busy} onClick={() => input.current?.click()}>
+          {currentName ? 'Ersetzen' : 'Hochladen'}
         </Button>
       </div>
+      <p className="mt-1.5 text-xs text-stage-subtle">PDF oder Fotos – mehrere Fotos werden zu einem PDF mit einer Seite pro Bild zusammengefasst.</p>
       {error && (
         <p className="mt-1.5 text-sm font-medium text-danger" role="alert">
           {error}
@@ -93,15 +99,30 @@ function PdfField({ label, icon: Icon, currentName, inputLabel, removeLabel, err
   );
 }
 
-/** Liest ein PDF ein und prüft Größe und Format; liefert die Änderung oder eine deutsche Fehlermeldung. */
-async function readPdf(file: File): Promise<PdfChange | string> {
-  if (file.size > MAX_PDF_BYTES) return `Die Datei ist mit ${formatBytes(file.size)} zu groß (maximal ${formatBytes(MAX_PDF_BYTES)}).`;
+const tooLarge = (bytes: number) => `Die Datei ist mit ${formatBytes(bytes)} zu groß (maximal ${formatBytes(MAX_PDF_BYTES)}).`;
+
+/**
+ * Liest die Auswahl ein: ein einzelnes PDF wird geprüft übernommen, ein oder mehrere Fotos werden
+ * zu einem PDF zusammengefasst. Liefert die Änderung oder eine deutsche Fehlermeldung.
+ */
+async function readSheet(files: File[]): Promise<PdfChange | string> {
+  const images = files.filter(isImageFile);
+  if (images.length > 0 && images.length !== files.length) return 'Bitte entweder ein PDF oder nur Fotos auswählen – nicht gemischt.';
+  if (images.length === 0 && files.length > 1) return 'Bitte nur ein PDF auswählen. Mehrere Seiten gehen als Fotos.';
   try {
+    if (images.length > 0) {
+      const data = await imagesToPdf(images);
+      if (data.byteLength > MAX_PDF_BYTES) return tooLarge(data.byteLength);
+      const base = images[0].name.replace(/\.[^.]+$/, '') || 'Sheet';
+      return { kind: 'replace', name: `${base}${images.length > 1 ? ` (${images.length} Seiten)` : ''}.pdf`, data };
+    }
+    const [file] = files;
+    if (file.size > MAX_PDF_BYTES) return tooLarge(file.size);
     const data = await file.arrayBuffer();
     if (!looksLikePdf(data)) return `„${file.name}“ ist keine gültige PDF-Datei.`;
     return { kind: 'replace', name: file.name, data };
-  } catch {
-    return 'Die Datei konnte nicht gelesen werden.';
+  } catch (error) {
+    return describeError(error);
   }
 }
 
@@ -114,15 +135,18 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
   const [drumChange, setDrumChange] = useState<PdfChange>({ kind: 'keep' });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'pdf' | 'drum', string>>>({});
   const [saving, setSaving] = useState(false);
+  const [converting, setConverting] = useState<'pdf' | 'drum' | null>(null);
 
   const update = (field: keyof FormState) => (event: { target: { value: string } }) => {
     setForm((current) => ({ ...current, [field]: event.target.value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const pick = (field: 'pdf' | 'drum', apply: (change: PdfChange) => void) => async (file: File | undefined) => {
-    if (!file) return;
-    const result = await readPdf(file);
+  const pick = (field: 'pdf' | 'drum', apply: (change: PdfChange) => void) => async (files: File[]) => {
+    if (files.length === 0) return;
+    setConverting(field);
+    const result = await readSheet(files);
+    setConverting(null);
     if (typeof result === 'string') return setErrors((current) => ({ ...current, [field]: result }));
     setErrors((current) => ({ ...current, [field]: undefined }));
     apply(result);
@@ -249,8 +273,9 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
 
         <FormSection title="Leadsheet & Drum Sheet">
           <PdfField
-            label="PDF-Leadsheet"
+            label="Leadsheet"
             icon={FileText}
+            busy={converting === 'pdf'}
             currentName={nameAfter(pdfChange, song?.pdfName ?? null)}
             inputLabel="PDF-Datei auswählen"
             removeLabel="PDF entfernen"
@@ -261,6 +286,7 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
           <PdfField
             label="Drum Sheet"
             icon={Drum}
+            busy={converting === 'drum'}
             currentName={nameAfter(drumChange, song?.drumSheetName ?? null)}
             inputLabel="Drum-Sheet-Datei auswählen"
             removeLabel="Drum Sheet entfernen"
@@ -274,7 +300,7 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
           <Button variant="ghost" onClick={onClose}>
             Abbrechen
           </Button>
-          <Button type="submit" variant="primary" icon={Save} disabled={saving}>
+          <Button type="submit" variant="primary" icon={Save} disabled={saving || converting !== null}>
             Speichern
           </Button>
         </div>

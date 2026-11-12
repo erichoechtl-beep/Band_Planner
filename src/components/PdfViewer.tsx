@@ -169,15 +169,19 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
     };
   }, [data, width, zoom, title, attempt]);
 
-  // Ob es überhaupt etwas zu scrollen gibt, hängt von Seitenzahl, Zoom und Bildschirm ab.
+  // Ob es etwas zu scrollen gibt, ändert sich mit jeder nachgeladenen Seite, mit Zoom und Bildschirmgröße –
+  // deshalb wird die Größe der Seiten laufend beobachtet.
   useEffect(() => {
     const scroller = scrollerRef.current;
-    if (!scroller || status !== 'ready') return;
+    const pages = pagesRef.current;
+    if (!scroller || !pages || status !== 'ready') return;
     const measure = () => setCanScroll(scroller.scrollHeight - scroller.clientHeight > 24);
     measure();
-    const timer = window.setTimeout(measure, 400);
-    return () => window.clearTimeout(timer);
-  }, [status, pageCount, zoom, width]);
+    const observer = new ResizeObserver(measure);
+    observer.observe(pages);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [status]);
 
   // Leertaste startet und stoppt den Bildlauf (auch per Bluetooth-Tastatur oder Pedal).
   useEffect(() => {
