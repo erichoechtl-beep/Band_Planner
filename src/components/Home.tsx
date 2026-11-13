@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { ReactNode } from 'react';
-import { ArrowRight, CalendarDays, Clock, FileText, FolderOpen, ListMusic, MapPin, Music, Play, RefreshCw } from 'lucide-react';
+import { ArrowRight, CalendarDays, Clock, ExternalLink, FileText, FolderOpen, Headphones, ListMusic, MapPin, Music, Play, RefreshCw, WifiOff } from 'lucide-react';
+import { SPOTIFY_PLAYLIST_ID } from '../config';
 import { useAdmin } from '../context/AdminContext';
 import { db, type Rehearsal } from '../db/schema';
 import { fmtLong, keyToDate, relativeLabel, todayKey } from '../lib/dates';
@@ -71,6 +72,45 @@ function StaffArt({ className = '' }: { className?: string }) {
         <rect x="646" y="72" width="2.2" height="48" />
       </g>
     </svg>
+  );
+}
+
+/** Eingebetteter Spotify-Player der Band-Playlist. Braucht Internet; offline erscheint ein Hinweis. */
+function SpotifyPlaylist() {
+  const { isOnline } = useAdmin();
+  if (!SPOTIFY_PLAYLIST_ID) return null;
+  const openUrl = `https://open.spotify.com/playlist/${SPOTIFY_PLAYLIST_ID}`;
+  return (
+    <section aria-label="Spotify-Playlist" className="card p-4 sm:p-5">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.08em] text-stage-subtle">
+          <Headphones className="h-4 w-4" aria-hidden />
+          Unsere Playlist
+        </h3>
+        <a
+          href={openUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-touch items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-brand hover:bg-stage-raised"
+        >
+          In Spotify öffnen <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+        </a>
+      </div>
+      {isOnline ? (
+        <iframe
+          title="Spotify-Playlist der Band"
+          src={`https://open.spotify.com/embed/playlist/${SPOTIFY_PLAYLIST_ID}?utm_source=generator`}
+          className="block h-[352px] w-full rounded-xl border-0"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy"
+        />
+      ) : (
+        <p className="flex min-h-24 items-center gap-3 rounded-xl border border-dashed border-stage-line px-4 text-[15px] text-stage-muted">
+          <WifiOff className="h-5 w-5 shrink-0" aria-hidden />
+          Offline – der Spotify-Player lädt, sobald du wieder Internet hast.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -267,6 +307,8 @@ export function Home({ onNavigate, onStartStage }: HomeProps) {
           </button>
         </article>
       </div>
+
+      <SpotifyPlaylist />
     </div>
   );
 }
