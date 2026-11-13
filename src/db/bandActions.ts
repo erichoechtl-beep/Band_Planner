@@ -7,7 +7,7 @@ function pruneStatus(setlist: Setlist): void {
   for (const id of Object.keys(setlist.songStatus)) if (!keep.has(id)) delete setlist.songStatus[id];
 }
 
-export type SongInput = Omit<Song, 'id' | 'pdfName' | 'drumSheetName'>;
+export type SongInput = Omit<Song, 'id' | 'pdfName' | 'drumSheetName' | 'bassSheetName'>;
 
 export type PdfChange = { kind: 'keep' } | { kind: 'remove' } | { kind: 'replace'; name: string; data: ArrayBuffer };
 
@@ -22,8 +22,14 @@ function pdfNameAfter(change: PdfChange, previous: string | null): string | null
   return previous;
 }
 
-/** Speichert einen Song samt Leadsheet- und Drum-Sheet-Änderung in einem Schritt. */
-export function saveSong(id: string | null, input: SongInput, pdf: PdfChange, drumSheet: PdfChange = { kind: 'keep' }): Promise<string> {
+/** Speichert einen Song samt Leadsheet-, Drum-Sheet- und Bass-Sheet-Änderung in einem Schritt. */
+export function saveSong(
+  id: string | null,
+  input: SongInput,
+  pdf: PdfChange,
+  drumSheet: PdfChange = { kind: 'keep' },
+  bassSheet: PdfChange = { kind: 'keep' },
+): Promise<string> {
   return bandWrite(async () => {
     const songId = id ?? createId();
     const previous = id ? await db.songs.get(id) : undefined;
@@ -32,9 +38,11 @@ export function saveSong(id: string | null, input: SongInput, pdf: PdfChange, dr
       id: songId,
       pdfName: pdfNameAfter(pdf, previous?.pdfName ?? null),
       drumSheetName: pdfNameAfter(drumSheet, previous?.drumSheetName ?? null),
+      bassSheetName: pdfNameAfter(bassSheet, previous?.bassSheetName ?? null),
     });
     await applyPdfChange(db.pdfs, songId, pdf);
     await applyPdfChange(db.drumSheets, songId, drumSheet);
+    await applyPdfChange(db.bassSheets, songId, bassSheet);
     return songId;
   });
 }
@@ -45,6 +53,7 @@ export function deleteSong(id: string): Promise<void> {
     await db.songs.delete(id);
     await db.pdfs.delete(id);
     await db.drumSheets.delete(id);
+    await db.bassSheets.delete(id);
     await db.setlists.toCollection().modify((setlist) => {
       setlist.songIds = setlist.songIds.filter((songId) => songId !== id);
       pruneStatus(setlist);

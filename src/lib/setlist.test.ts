@@ -9,7 +9,7 @@ const setlist: Setlist = {
   songStatus: { b: 'offen', d: 'raus', e: 'offen' },
 };
 
-const song = (id: string): Song => ({ id, title: id, artist: '', key: '', bpm: null, tuning: '', leadVocals: '', duration: '', structure: '', chords: '', pdfName: null, drumSheetName: null });
+const song = (id: string): Song => ({ id, title: id, artist: '', key: '', bpm: null, tuning: '', leadVocals: '', duration: '', structure: '', chords: '', pdfName: null, drumSheetName: null, bassSheetName: null });
 
 describe('Setlist-Status', () => {
   it('behandelt Songs ohne Eintrag als fix', () => {

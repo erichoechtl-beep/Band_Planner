@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ChevronRight, Drum, FileText, Loader2, MicVocal, Music, Pencil, Plus, Save, Search, Trash2, Upload, type LucideIcon } from 'lucide-react';
+import { ChevronRight, Drum, FileText, Guitar, Loader2, MicVocal, Music, Pencil, Plus, Save, Search, Trash2, Upload, type LucideIcon } from 'lucide-react';
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { VOCALISTS } from '../config';
 import { useAdmin } from '../context/AdminContext';
@@ -133,16 +133,17 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
   const [form, setForm] = useState<FormState>(() => toFormState(song));
   const [pdfChange, setPdfChange] = useState<PdfChange>({ kind: 'keep' });
   const [drumChange, setDrumChange] = useState<PdfChange>({ kind: 'keep' });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'pdf' | 'drum', string>>>({});
+  const [bassChange, setBassChange] = useState<PdfChange>({ kind: 'keep' });
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'pdf' | 'drum' | 'bass', string>>>({});
   const [saving, setSaving] = useState(false);
-  const [converting, setConverting] = useState<'pdf' | 'drum' | null>(null);
+  const [converting, setConverting] = useState<'pdf' | 'drum' | 'bass' | null>(null);
 
   const update = (field: keyof FormState) => (event: { target: { value: string } }) => {
     setForm((current) => ({ ...current, [field]: event.target.value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const pick = (field: 'pdf' | 'drum', apply: (change: PdfChange) => void) => async (files: File[]) => {
+  const pick = (field: 'pdf' | 'drum' | 'bass', apply: (change: PdfChange) => void) => async (files: File[]) => {
     if (files.length === 0) return;
     setConverting(field);
     const result = await readSheet(files);
@@ -180,6 +181,7 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
         },
         pdfChange,
         drumChange,
+        bassChange,
       );
       toast(song ? 'Song gespeichert.' : 'Song angelegt.');
       onClose();
@@ -271,7 +273,7 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
           </div>
         </FormSection>
 
-        <FormSection title="Leadsheet & Drum Sheet">
+        <FormSection title="Leadsheet, Bass & Drum Sheet">
           <PdfField
             label="Leadsheet"
             icon={FileText}
@@ -282,6 +284,17 @@ function SongEditor({ song, onClose }: { song: Song | null; onClose: () => void 
             error={errors.pdf}
             onPick={pick('pdf', setPdfChange)}
             onRemove={() => setPdfChange({ kind: 'remove' })}
+          />
+          <PdfField
+            label="Bass Sheet"
+            icon={Guitar}
+            busy={converting === 'bass'}
+            currentName={nameAfter(bassChange, song?.bassSheetName ?? null)}
+            inputLabel="Bass-Sheet-Datei auswählen"
+            removeLabel="Bass Sheet entfernen"
+            error={errors.bass}
+            onPick={pick('bass', setBassChange)}
+            onRemove={() => setBassChange({ kind: 'remove' })}
           />
           <PdfField
             label="Drum Sheet"
@@ -322,7 +335,7 @@ function SongDetails({ song, onClose, onEdit }: { song: Song; onClose: () => voi
   const { isAdmin } = useAdmin();
   const { toast, confirm } = useFeedback();
   const [semitones, setSemitones] = useState(0);
-  const [showPdf, setShowPdf] = useState<'leadsheet' | 'drum' | null>(null);
+  const [showPdf, setShowPdf] = useState<'leadsheet' | 'bass' | 'drum' | null>(null);
   const shown = useMemo(() => transposeSong(song, semitones), [song, semitones]);
 
   const remove = async () => {
@@ -358,11 +371,16 @@ function SongDetails({ song, onClose, onEdit }: { song: Song; onClose: () => voi
         </div>
 
         <TransposeTool semitones={semitones} originalKey={song.key} transposedKey={shown.key} onChange={setSemitones} />
-        {(song.pdfName || song.drumSheetName) && (
-          <div className="grid gap-2 sm:grid-cols-2">
+        {(song.pdfName || song.bassSheetName || song.drumSheetName) && (
+          <div className="grid gap-2 sm:grid-cols-3">
             {song.pdfName && (
               <Button variant="accent" icon={FileText} onClick={() => setShowPdf('leadsheet')}>
                 PDF-Leadsheet öffnen
+              </Button>
+            )}
+            {song.bassSheetName && (
+              <Button icon={Guitar} onClick={() => setShowPdf('bass')}>
+                Bass Sheet öffnen
               </Button>
             )}
             {song.drumSheetName && (
@@ -398,7 +416,7 @@ function SongDetails({ song, onClose, onEdit }: { song: Song; onClose: () => voi
       {showPdf && (
         <PdfViewer
           songId={song.id}
-          title={showPdf === 'drum' ? `${song.title} · Drum Sheet` : song.title}
+          title={showPdf === 'drum' ? `${song.title} · Drum Sheet` : showPdf === 'bass' ? `${song.title} · Bass Sheet` : song.title}
           source={showPdf}
           onClose={() => setShowPdf(null)}
         />
@@ -427,12 +445,13 @@ export function SongManager() {
   const selected = songs.find((song) => song.id === selectedId) ?? null;
   const pdfCount = songs.filter((song) => song.pdfName).length;
   const drumCount = songs.filter((song) => song.drumSheetName).length;
+  const bassCount = songs.filter((song) => song.bassSheetName).length;
 
   return (
     <section>
       <PageHeader
         title="Songs & PDFs"
-        description={songs.length > 0 ? `${songs.length} Songs im Repertoire · ${pdfCount} mit Leadsheet · ${drumCount} mit Drum Sheet` : 'Repertoire mit Tonart, Tempo, Ablauf und Leadsheets.'}
+        description={songs.length > 0 ? `${songs.length} Songs im Repertoire · ${pdfCount} Leadsheets · ${bassCount} Bass · ${drumCount} Drums` : 'Repertoire mit Tonart, Tempo, Ablauf und Leadsheets.'}
         action={
           isAdmin && (
             <Button variant="primary" icon={Plus} onClick={() => setEditor({ song: null })}>
@@ -485,6 +504,7 @@ export function SongManager() {
                     <span className="flex items-center gap-2">
                       <span className="truncate font-medium">{song.title}</span>
                       {song.pdfName && <FileText className="h-4 w-4 shrink-0 text-accent" aria-label="mit PDF" />}
+                      {song.bassSheetName && <Guitar className="h-4 w-4 shrink-0 text-accent" aria-label="mit Bass Sheet" />}
                       {song.drumSheetName && <Drum className="h-4 w-4 shrink-0 text-accent" aria-label="mit Drum Sheet" />}
                     </span>
                     {song.artist && <span className="block truncate text-sm text-stage-muted">{song.artist}</span>}

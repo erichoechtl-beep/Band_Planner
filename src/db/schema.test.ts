@@ -433,6 +433,7 @@ describe('Termin-Art und Lead Vocals', () => {
     ]);
     expect((await db.songs.get('s'))?.leadVocals).toBe('');
     expect((await db.songs.get('s'))?.drumSheetName).toBeNull();
+    expect((await db.songs.get('s'))?.bassSheetName).toBeNull();
   });
 });
 
@@ -473,5 +474,29 @@ describe('Drum Sheets', () => {
     expect(() => parseBandData(file)).toThrow('Das eingebettete Drum Sheet ist kein PDF');
     delete file.songs[0].drumSheet;
     expect(parseBandData(file).songs[0].drumSheet).toBeNull();
+  });
+});
+
+describe('Bass Sheets', () => {
+  const pdfBytes = () => Uint8Array.from(Buffer.from(cloneSeed().songs.find((song) => song.pdf)!.pdf!.base64, 'base64')).buffer as ArrayBuffer;
+
+  it('speichert ein Bass Sheet neben Leadsheet und Drum Sheet und exportiert es', async () => {
+    const [song] = await db.songs.toArray();
+    const { id, pdfName: _p, drumSheetName: _d, bassSheetName: _b, ...input } = song;
+    await saveSong(id, input, { kind: 'keep' }, { kind: 'keep' }, { kind: 'replace', name: 'bass.pdf', data: pdfBytes() });
+    expect((await db.songs.get(id))?.bassSheetName).toBe('bass.pdf');
+    const exported = await buildBandDataFile();
+    expect(exported.songs.find((entry) => entry.id === id)?.bassSheet?.name).toBe('bass.pdf');
+    await db.bassSheets.clear();
+    await applyBandData(parseBandDataText(JSON.stringify({ ...exported, lastUpdated: '2099-01-01T00:00:00.000Z' })), 'Test');
+    expect((await db.bassSheets.get(id))?.name).toBe('bass.pdf');
+    await deleteSong(id);
+    expect(await db.bassSheets.get(id)).toBeUndefined();
+  });
+
+  it('akzeptiert ältere Dateien ohne Bass Sheets', () => {
+    const file = cloneSeed() as unknown as { songs: Record<string, unknown>[] };
+    delete file.songs[0].bassSheet;
+    expect(parseBandData(file).songs[0].bassSheet).toBeNull();
   });
 });

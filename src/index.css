@@ -122,6 +122,15 @@
     animation: beat 0.5s ease-out infinite;
   }
 
+  /* Probeansicht: neuer Song gleitet aus der Blätter-Richtung herein */
+  .song-enter-next {
+    animation: song-enter-next 0.22s ease-out;
+  }
+
+  .song-enter-prev {
+    animation: song-enter-prev 0.22s ease-out;
+  }
+
   .h-screen-safe {
     height: 100vh;
     height: 100dvh;
@@ -141,6 +150,20 @@
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+}
+
+@keyframes song-enter-next {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes song-enter-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
   }
 }
 

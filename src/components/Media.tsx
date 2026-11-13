@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Download,
   Drum,
+  Guitar,
   Eye,
   File,
   FilePen,
@@ -240,14 +241,15 @@ interface LeadsheetEntry {
   setlists: { name: string; status: string }[];
 }
 
-type SongPdfKind = 'leadsheet' | 'drum';
-const SONG_PDF_LABEL: Record<SongPdfKind, string> = { leadsheet: 'Leadsheet', drum: 'Drum Sheet' };
+type SongPdfKind = 'leadsheet' | 'bass' | 'drum';
+const SONG_PDF_LABEL: Record<SongPdfKind, string> = { leadsheet: 'Leadsheet', bass: 'Bass Sheet', drum: 'Drum Sheet' };
+const songPdfTable = (kind: SongPdfKind) => (kind === 'drum' ? db.drumSheets : kind === 'bass' ? db.bassSheets : db.pdfs);
 
 function LeadsheetRow({ entry, kind, onOpen }: { entry: LeadsheetEntry; kind: SongPdfKind; onOpen: () => void }) {
   const { song, setlists } = entry;
-  const Icon = kind === 'drum' ? Drum : FileText;
+  const Icon = kind === 'drum' ? Drum : kind === 'bass' ? Guitar : FileText;
   const download = async () => {
-    const pdf = await (kind === 'drum' ? db.drumSheets : db.pdfs).get(song.id);
+    const pdf = await songPdfTable(kind).get(song.id);
     if (pdf) downloadBlob(new Blob([pdf.data], { type: 'application/pdf' }), pdf.name);
   };
   return (
@@ -277,7 +279,7 @@ function LeadsheetRow({ entry, kind, onOpen }: { entry: LeadsheetEntry; kind: So
   );
 }
 
-type Filter = 'alle' | 'leadsheets' | 'drumsheets' | string;
+type Filter = 'alle' | 'leadsheets' | 'basssheets' | 'drumsheets' | string;
 
 export function Media() {
   const { isAdmin } = useAdmin();
@@ -301,16 +303,21 @@ export function Media() {
           song,
           setlists: (setlists ?? []).filter((setlist) => setlist.songIds.includes(song.id)).map((setlist) => ({ name: setlist.name, status: statusOf(setlist, song.id) })),
         }));
-    return { leadsheets: entries((song) => Boolean(song.pdfName)), drumSheets: entries((song) => Boolean(song.drumSheetName)) };
+    return {
+      leadsheets: entries((song) => Boolean(song.pdfName)),
+      bassSheets: entries((song) => Boolean(song.bassSheetName)),
+      drumSheets: entries((song) => Boolean(song.drumSheetName)),
+    };
   }, [songs, setlists]);
-  const { leadsheets, drumSheets } = songPdfs;
+  const { leadsheets, bassSheets, drumSheets } = songPdfs;
 
   if (!documents || !songs || !setlists) return null;
 
   const term = search.trim().toLocaleLowerCase('de');
   const matches = (text: string) => !term || text.toLocaleLowerCase('de').includes(term);
-  const shownDocs = filter === 'leadsheets' || filter === 'drumsheets' ? [] : documents.filter((doc) => (filter === 'alle' || doc.category === filter) && matches(`${doc.title} ${doc.fileName}`));
+  const shownDocs = ['leadsheets', 'basssheets', 'drumsheets'].includes(filter) ? [] : documents.filter((doc) => (filter === 'alle' || doc.category === filter) && matches(`${doc.title} ${doc.fileName}`));
   const shownLeadsheets = filter === 'alle' || filter === 'leadsheets' ? leadsheets.filter(({ song }) => matches(`${song.title} ${song.artist}`)) : [];
+  const shownBassSheets = filter === 'alle' || filter === 'basssheets' ? bassSheets.filter(({ song }) => matches(`${song.title} ${song.artist}`)) : [];
   const shownDrumSheets = filter === 'alle' || filter === 'drumsheets' ? drumSheets.filter(({ song }) => matches(`${song.title} ${song.artist}`)) : [];
   const usedCategories = DOCUMENT_CATEGORIES.filter(({ id }) => documents.some((doc) => doc.category === id));
 
@@ -330,9 +337,10 @@ export function Media() {
   };
 
   const chips: { id: Filter; label: string; count: number }[] = [
-    { id: 'alle', label: 'Alle', count: documents.length + leadsheets.length + drumSheets.length },
+    { id: 'alle', label: 'Alle', count: documents.length + leadsheets.length + bassSheets.length + drumSheets.length },
     ...usedCategories.map(({ id, label }) => ({ id, label, count: documents.filter((doc) => doc.category === id).length })),
     { id: 'leadsheets', label: 'Leadsheets', count: leadsheets.length },
+    { id: 'basssheets', label: 'Bass Sheets', count: bassSheets.length },
     { id: 'drumsheets', label: 'Drum Sheets', count: drumSheets.length },
   ];
 
@@ -340,7 +348,7 @@ export function Media() {
     <section>
       <PageHeader
         title="Medien"
-        description="Band-Dokumente wie Rider, Angebot oder Pressetext – und alle Leadsheets und Drum Sheets aus den Songs."
+        description="Band-Dokumente wie Rider, Angebot oder Pressetext – und alle Leadsheets, Bass und Drum Sheets aus den Songs."
         action={
           isAdmin && (
             <>
@@ -376,7 +384,7 @@ export function Media() {
         </div>
       </div>
 
-      {filter !== 'leadsheets' && filter !== 'drumsheets' && (
+      {!['leadsheets', 'basssheets', 'drumsheets'].includes(filter) && (
         <div className="mb-8">
           <SectionTitle>Band-Dokumente</SectionTitle>
           {shownDocs.length > 0 ? (
@@ -414,6 +422,23 @@ export function Media() {
         </div>
       )}
 
+      {(filter === 'alle' || filter === 'basssheets') && (
+        <div className="mt-8">
+          <SectionTitle>Bass Sheets aus den Songs</SectionTitle>
+          {shownBassSheets.length > 0 ? (
+            <ul className="card divide-y divide-stage-line">
+              {shownBassSheets.map((entry) => (
+                <LeadsheetRow key={entry.song.id} entry={entry} kind="bass" onOpen={() => setOpenSong({ song: entry.song, kind: 'bass' })} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon={Guitar} title={bassSheets.length === 0 ? 'Noch keine Bass Sheets' : 'Nichts gefunden'}>
+              {bassSheets.length === 0 ? 'Bass Sheets lädt der Admin im Bereich „Songs“ beim jeweiligen Song hoch – genau wie Leadsheets.' : 'Probiere einen anderen Suchbegriff.'}
+            </EmptyState>
+          )}
+        </div>
+      )}
+
       {(filter === 'alle' || filter === 'drumsheets') && (
         <div className="mt-8">
           <SectionTitle>Drum Sheets aus den Songs</SectionTitle>
@@ -445,7 +470,7 @@ export function Media() {
       {openSong && (
         <PdfViewer
           songId={openSong.song.id}
-          title={openSong.kind === 'drum' ? `${openSong.song.title} · Drum Sheet` : openSong.song.title}
+          title={openSong.kind === 'leadsheet' ? openSong.song.title : `${openSong.song.title} · ${SONG_PDF_LABEL[openSong.kind]}`}
           source={openSong.kind}
           onClose={() => setOpenSong(null)}
         />

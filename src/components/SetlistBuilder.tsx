@@ -26,6 +26,7 @@ import {
   GripVertical,
   ListMusic,
   MicVocal,
+  Music,
   Pencil,
   Play,
   Plus,
@@ -41,6 +42,7 @@ import { addSongToSetlist, createSetlist, deleteSetlist, renameSetlist, setSetli
 import { db, describeError, SONG_STATUSES, type Setlist, type Song, type SongStatus } from '../db/schema';
 import { groupByStatus, reorderWithinGroup, resolveSongs, STATUS_LABEL, STATUS_SHORT } from '../lib/setlist';
 import { formatTotalDuration, sumDurations } from '../lib/time';
+import { PlaylistModal } from './Playlist';
 import { NoteButton } from './SongNotes';
 import { Badge, Button, EmptyState, IconButton, InfoNote, Modal, PageHeader } from './ui';
 
@@ -483,6 +485,7 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
   const { isAdmin } = useAdmin();
   const { toast, confirm } = useFeedback();
   const [adding, setAdding] = useState(false);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
   const [editingName, setEditingName] = useState<string | null>(null);
   const noteSongIds = useLiveQuery(async () => new Set((await db.personalNotes.toArray()).map((note) => note.songId)), [], new Set<string>());
 
@@ -542,9 +545,14 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
             )}
           </div>
         )}
-        <Button variant="primary" icon={Play} onClick={onStartStage} disabled={playable === 0} className="sm:shrink-0">
-          Probeansicht starten
-        </Button>
+        <div className="grid grid-cols-[1fr_auto] gap-2 sm:flex sm:shrink-0">
+          <Button variant="primary" icon={Play} onClick={onStartStage} disabled={playable === 0}>
+            Probeansicht starten
+          </Button>
+          <Button icon={Music} onClick={() => setPlaylistOpen(true)} disabled={songs.length === 0} aria-label="Als Playlist (Spotify, Apple Music)" title="Als Playlist für Spotify oder Apple Music">
+            Playlist
+          </Button>
+        </div>
       </div>
 
       <div className="p-2 sm:p-3">
@@ -570,6 +578,7 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
         )}
       </div>
 
+      {playlistOpen && <PlaylistModal setlist={setlist} songsById={songsById} onClose={() => setPlaylistOpen(false)} />}
       {adding && <AddSongsModal setlist={setlist} songs={[...songsById.values()]} onClose={() => setAdding(false)} />}
     </div>
   );

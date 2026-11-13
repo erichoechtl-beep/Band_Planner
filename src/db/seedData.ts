@@ -36,6 +36,7 @@ export const SEED_BAND_DATA: BandDataFile = {
       ].join('\n'),
       pdf: null,
       drumSheet: null,
+      bassSheet: null,
     },
     {
       id: 'song-major-tom',
@@ -64,6 +65,7 @@ export const SEED_BAND_DATA: BandDataFile = {
       ].join('\n'),
       pdf: null,
       drumSheet: null,
+      bassSheet: null,
     },
     {
       id: 'song-westerland',
@@ -91,6 +93,7 @@ export const SEED_BAND_DATA: BandDataFile = {
       ].join('\n'),
       pdf: { name: 'Westerland-Leadsheet.pdf', base64: SEED_LEADSHEET_BASE64 },
       drumSheet: null,
+      bassSheet: null,
     },
   ],
   setlists: [

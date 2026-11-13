@@ -7,6 +7,7 @@ import {
   CircleMinus,
   Drum,
   FileText,
+  Guitar,
   ListOrdered,
   Lock,
   Maximize,
@@ -20,7 +21,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { useFeedback } from '../context/FeedbackContext';
 import { setSongStatus } from '../db/bandActions';
@@ -179,7 +180,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
   const [index, setIndex] = useState(initialIndex);
   // Transposition je Song merken, damit sie beim Vor- und Zurückblättern erhalten bleibt.
   const [transpositions, setTranspositions] = useState<Record<string, number>>({});
-  const [panel, setPanel] = useState<'pdf' | 'drum' | 'notes' | 'list' | null>(null);
+  const [panel, setPanel] = useState<'pdf' | 'bass' | 'drum' | 'notes' | 'list' | null>(null);
 
   useWakeLock();
   const fullscreen = useFullscreen();
@@ -198,13 +199,25 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
 
   const notes = useLiveQuery(() => (song ? db.personalNotes.where('songId').equals(song.id).sortBy('updatedAt') : []), [song?.id]);
 
+  // Richtung des letzten Blätterns – steuert die kurze Einblend-Animation.
+  const [direction, setDirection] = useState<'next' | 'prev' | null>(null);
+  const indexRef = useRef(index);
+  indexRef.current = currentIndex;
   const goTo = useCallback(
     (target: number) => {
+      setDirection(target > indexRef.current ? 'next' : 'prev');
       setIndex(target);
       onIndexChange(target);
     },
     [onIndexChange],
   );
+
+  // Wischen: nach links = nächster Song, nach rechts = vorheriger. Senkrechtes Scrollen bleibt unberührt.
+  const swipe = useRef<{ x: number; y: number; time: number } | null>(null);
+  const onTouchStart = (event: TouchEvent) => {
+    const touch = event.touches[0];
+    swipe.current = event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY, time: Date.now() } : null;
+  };
 
   // Pfeiltasten, Bild-Tasten und Bluetooth-Fußpedale (die meist genau diese Tasten senden)
   useEffect(() => {
@@ -278,8 +291,27 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid max-w-6xl gap-5 px-4 py-5 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
+      <main
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+        onTouchStart={onTouchStart}
+        onTouchEnd={(event) => {
+          const start = swipe.current;
+          swipe.current = null;
+          const touch = event.changedTouches[0];
+          if (!start || !touch) return;
+          const dx = touch.clientX - start.x;
+          const dy = touch.clientY - start.y;
+          if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - start.time > 700) return;
+          if (dx < 0 && currentIndex < lastIndex) goTo(currentIndex + 1);
+          if (dx > 0 && currentIndex > 0) goTo(currentIndex - 1);
+        }}
+      >
+        <div
+          key={song.id}
+          className={`mx-auto grid max-w-6xl gap-5 px-4 py-5 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8 ${
+            direction === 'next' ? 'song-enter-next' : direction === 'prev' ? 'song-enter-prev' : ''
+          }`}
+        >
           {/* Song */}
           <div className="flex min-w-0 flex-col gap-5 sm:gap-6">
             <div>
@@ -357,10 +389,14 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
 
           {/* Werkzeuge und Notiz – im Querformat als rechte Spalte */}
           <aside className="flex min-w-0 flex-col gap-3">
-            <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
               <Button variant="primary" icon={FileText} className="min-h-14 px-2 text-base lg:justify-start lg:px-5" disabled={!song.pdfName} onClick={() => setPanel('pdf')} aria-label={song.pdfName ? 'PDF-Leadsheet' : 'Kein PDF'}>
                 <span className="lg:hidden">{song.pdfName ? 'Leadsheet' : 'Kein PDF'}</span>
                 <span className="hidden lg:inline">{song.pdfName ? 'PDF-Leadsheet' : 'Kein PDF'}</span>
+              </Button>
+              <Button icon={Guitar} className="min-h-14 px-2 text-base lg:justify-start lg:px-5" disabled={!song.bassSheetName} onClick={() => setPanel('bass')} aria-label={song.bassSheetName ? 'Bass Sheet' : 'Kein Bass Sheet'}>
+                <span className="lg:hidden">{song.bassSheetName ? 'Bass' : 'Kein Bass'}</span>
+                <span className="hidden lg:inline">{song.bassSheetName ? 'Bass Sheet' : 'Kein Bass Sheet'}</span>
               </Button>
               <Button icon={Drum} className="min-h-14 px-2 text-base lg:justify-start lg:px-5" disabled={!song.drumSheetName} onClick={() => setPanel('drum')} aria-label={song.drumSheetName ? 'Drum Sheet' : 'Kein Drum Sheet'}>
                 <span className="lg:hidden">{song.drumSheetName ? 'Drums' : 'Keine Drums'}</span>
@@ -430,6 +466,16 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
       </footer>
 
       {panel === 'pdf' && <PdfViewer songId={song.id} title={song.title} durationSeconds={parseDuration(song.duration)} onClose={() => setPanel(null)} />}
+
+      {panel === 'bass' && (
+        <PdfViewer
+          songId={song.id}
+          title={`${song.title} · Bass Sheet`}
+          source="bass"
+          durationSeconds={parseDuration(song.duration)}
+          onClose={() => setPanel(null)}
+        />
+      )}
 
       {panel === 'drum' && (
         <PdfViewer
