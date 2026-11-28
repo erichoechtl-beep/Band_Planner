@@ -24,7 +24,7 @@ function loadPdfEngine(): Promise<PdfEngine> {
   return enginePromise;
 }
 
-const ZOOM_STEPS = [1, 1.25, 1.5, 2, 3];
+export const ZOOM_STEPS = [1, 1.25, 1.5, 2, 3];
 /** Merkt sich, ob Leadsheets im Vollbild geöffnet werden sollen (pro Gerät). */
 const FULLSCREEN_KEY = 'band-planner:pdf-vollbild';
 /** Im Vollbild blenden sich die Bedienelemente nach dieser Zeit ohne Berührung aus. */
@@ -117,7 +117,7 @@ function useImmersive() {
 
   return { immersive, setImmersive: set };
 }
-const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+export const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 /** Ohne bekannte Songlänge: so viele Pixel pro Sekunde */
 const DEFAULT_SPEED = 30;
 
@@ -126,7 +126,7 @@ const DEFAULT_SPEED = 30;
  * ungefähr in der Länge des Songs durchläuft; mit „Schneller“/„Langsamer“ lässt es sich anpassen.
  * Scrollt man von Hand, läuft der Bildlauf von der neuen Stelle aus weiter.
  */
-function useAutoScroll(scrollerRef: RefObject<HTMLDivElement | null>, durationSeconds: number | null) {
+export function useAutoScroll(scrollerRef: RefObject<HTMLDivElement | null>, durationSeconds: number | null) {
   const [running, setRunning] = useState(false);
   const [speedIndex, setSpeedIndex] = useState(2);
 
@@ -157,6 +157,159 @@ function useAutoScroll(scrollerRef: RefObject<HTMLDivElement | null>, durationSe
   return { running, setRunning, speedIndex, setSpeedIndex };
 }
 
+export type PdfStatus = 'loading' | 'ready' | 'error';
+
+/**
+ * Rendert die Seiten eines PDFs als Canvas in `pagesRef` – eingepasst auf die Breite von `scrollerRef`
+ * (minus `margin`) und vergrößert um `zoom`. Die erste Seite erscheint sofort, weitere folgen.
+ */
+export function usePdfPages({
+  data,
+  title,
+  scrollerRef,
+  pagesRef,
+  zoom,
+  margin,
+  attempt = 0,
+}: {
+  data: ArrayBuffer | undefined;
+  title: string;
+  scrollerRef: RefObject<HTMLDivElement | null>;
+  pagesRef: RefObject<HTMLDivElement | null>;
+  zoom: number;
+  margin: number;
+  attempt?: number;
+}) {
+  const [width, setWidth] = useState(0);
+  const [status, setStatus] = useState<PdfStatus>('loading');
+  const [pageCount, setPageCount] = useState(0);
+
+  // Seiten werden auf die verfügbare Breite eingepasst (Drehen des Tablets eingeschlossen).
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const update = () => setWidth(scroller.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [scrollerRef]);
+
+  useEffect(() => {
+    if (!data || width === 0) return;
+    let cancelled = false;
+    let destroy: (() => void) | undefined;
+
+    (async () => {
+      setStatus((current) => (current === 'ready' ? current : 'loading'));
+      try {
+        const engine = await loadPdfEngine();
+        // Der Worker übernimmt den Puffer, deshalb bekommt er eine Kopie.
+        const task = engine.getDocument({ data: new Uint8Array(data.slice(0)) });
+        destroy = () => void task.destroy();
+        const document_ = await task.promise;
+        if (cancelled) return;
+        setPageCount(document_.numPages);
+
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        for (let number = 1; number <= document_.numPages; number++) {
+          const page = await document_.getPage(number);
+          if (cancelled) return;
+          const baseViewport = page.getViewport({ scale: 1 });
+          const cssScale = ((width - margin) / baseViewport.width) * zoom;
+          const viewport = page.getViewport({ scale: cssScale * pixelRatio });
+
+          const canvas = window.document.createElement('canvas');
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          canvas.style.width = `${Math.floor(viewport.width / pixelRatio)}px`;
+          canvas.style.height = `${Math.floor(viewport.height / pixelRatio)}px`;
+          canvas.className = 'mx-auto block rounded-sm bg-white shadow-pop';
+          canvas.setAttribute('aria-label', `${title}, Seite ${number}`);
+          await page.render({ canvas, viewport }).promise;
+          if (cancelled) return;
+          // Erste Seite sofort zeigen, weitere nachreichen.
+          if (number === 1) pagesRef.current?.replaceChildren(canvas);
+          else pagesRef.current?.append(canvas);
+          setStatus('ready');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('PDF konnte nicht angezeigt werden:', error);
+          setStatus('error');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      destroy?.();
+    };
+  }, [data, width, zoom, title, attempt, margin, pagesRef]);
+
+  return { status, setStatus, pageCount };
+}
+
+/**
+ * Ob es etwas zu scrollen gibt, ändert sich mit jeder nachgeladenen Seite, mit Zoom und Bildschirmgröße –
+ * deshalb wird die Größe der Seiten laufend beobachtet.
+ */
+export function useCanScroll(scrollerRef: RefObject<HTMLDivElement | null>, pagesRef: RefObject<HTMLDivElement | null>, status: PdfStatus) {
+  const [canScroll, setCanScroll] = useState(false);
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const pages = pagesRef.current;
+    if (!scroller || !pages || status !== 'ready') return;
+    const measure = () => setCanScroll(scroller.scrollHeight - scroller.clientHeight > 24);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(pages);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [scrollerRef, pagesRef, status]);
+  return canScroll;
+}
+
+/** Bedienleiste für den automatischen Bildlauf: langsamer, Start/Pause, Tempo, schneller. */
+/** compact: am Handy nur Symbol statt Text – für Leisten mit weiteren Knöpfen daneben. */
+export function AutoScrollBar({ autoScroll, canScroll, compact = false }: { autoScroll: ReturnType<typeof useAutoScroll>; canScroll: boolean; compact?: boolean }) {
+  return (
+    <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-stage-line bg-stage-surface/95 p-1.5 shadow-pop backdrop-blur" role="group" aria-label="Automatischer Bildlauf">
+      <IconButton
+        icon={Minus}
+        label="Langsamer"
+        disabled={autoScroll.speedIndex === 0}
+        onClick={() => autoScroll.setSpeedIndex(autoScroll.speedIndex - 1)}
+        className="rounded-full"
+      />
+      <button
+        type="button"
+        onClick={() => autoScroll.setRunning(!autoScroll.running)}
+        disabled={!canScroll}
+        aria-pressed={autoScroll.running}
+        aria-label={autoScroll.running ? 'Pause' : 'Auto-Scroll'}
+        title={canScroll ? 'Leertaste startet und stoppt' : 'Das PDF passt komplett auf den Bildschirm'}
+        className={`flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-full ${compact ? 'px-3 sm:px-5' : 'px-5'} whitespace-nowrap text-[15px] font-semibold transition-colors disabled:opacity-40 ${
+          autoScroll.running ? 'bg-stage-text text-stage-surface' : 'bg-brand text-on-fill hover:bg-brand-strong'
+        }`}
+      >
+        {autoScroll.running ? <Pause className="h-[18px] w-[18px]" aria-hidden /> : <Play className="h-[18px] w-[18px]" aria-hidden />}
+        <span className={compact ? 'hidden sm:inline' : ''}>{autoScroll.running ? 'Pause' : 'Auto-Scroll'}</span>
+      </button>
+      <span className="w-12 text-center text-sm font-semibold tabular-nums text-stage-muted" aria-live="polite" aria-label={`Tempo ${SPEED_STEPS[autoScroll.speedIndex]}-fach`}>
+        {SPEED_STEPS[autoScroll.speedIndex].toLocaleString('de-DE')}×
+      </span>
+      <IconButton
+        icon={Plus}
+        label="Schneller"
+        disabled={autoScroll.speedIndex === SPEED_STEPS.length - 1}
+        onClick={() => autoScroll.setSpeedIndex(autoScroll.speedIndex + 1)}
+        className="rounded-full"
+      />
+    </div>
+  );
+}
+
 interface PdfViewerProps {
   songId: string;
   title: string;
@@ -185,7 +338,6 @@ interface PdfModalProps {
 export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: PdfModalProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const autoScroll = useAutoScroll(scrollerRef, durationSeconds);
-  const [canScroll, setCanScroll] = useState(false);
   const { immersive, setImmersive } = useImmersive();
   const [controlsShown, setControlsShown] = useState(true);
   const hideTimer = useRef<number | undefined>(undefined);
@@ -204,92 +356,10 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
 
   const pagesRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(0);
-  const [width, setWidth] = useState(0);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [pageCount, setPageCount] = useState(0);
   const [attempt, setAttempt] = useState(0);
-
-  // Seiten werden auf die verfügbare Breite eingepasst (Drehen des Tablets eingeschlossen).
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    const update = () => setWidth(scroller.clientWidth);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(scroller);
-    return () => observer.disconnect();
-  }, []);
-
   const zoom = ZOOM_STEPS[zoomIndex];
-  const data = pdf?.data;
-
-  useEffect(() => {
-    if (!data || width === 0) return;
-    let cancelled = false;
-    let destroy: (() => void) | undefined;
-
-    (async () => {
-      setStatus((current) => (current === 'ready' ? current : 'loading'));
-      try {
-        const engine = await loadPdfEngine();
-        // Der Worker übernimmt den Puffer, deshalb bekommt er eine Kopie.
-        const task = engine.getDocument({ data: new Uint8Array(data.slice(0)) });
-        destroy = () => void task.destroy();
-        const document_ = await task.promise;
-        if (cancelled) return;
-        setPageCount(document_.numPages);
-
-        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-        const canvases: HTMLCanvasElement[] = [];
-        for (let number = 1; number <= document_.numPages; number++) {
-          const page = await document_.getPage(number);
-          if (cancelled) return;
-          const baseViewport = page.getViewport({ scale: 1 });
-          const cssScale = ((width - (immersive ? 0 : 16)) / baseViewport.width) * zoom;
-          const viewport = page.getViewport({ scale: cssScale * pixelRatio });
-
-          const canvas = window.document.createElement('canvas');
-          canvas.width = Math.floor(viewport.width);
-          canvas.height = Math.floor(viewport.height);
-          canvas.style.width = `${Math.floor(viewport.width / pixelRatio)}px`;
-          canvas.style.height = `${Math.floor(viewport.height / pixelRatio)}px`;
-          canvas.className = 'mx-auto block rounded-sm bg-white shadow-pop';
-          canvas.setAttribute('aria-label', `${title}, Seite ${number}`);
-          await page.render({ canvas, viewport }).promise;
-          if (cancelled) return;
-          canvases.push(canvas);
-          // Erste Seite sofort zeigen, weitere nachreichen.
-          if (number === 1) pagesRef.current?.replaceChildren(canvas);
-          else pagesRef.current?.append(canvas);
-          setStatus('ready');
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('PDF konnte nicht angezeigt werden:', error);
-          setStatus('error');
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      destroy?.();
-    };
-  }, [data, width, zoom, title, attempt, immersive]);
-
-  // Ob es etwas zu scrollen gibt, ändert sich mit jeder nachgeladenen Seite, mit Zoom und Bildschirmgröße –
-  // deshalb wird die Größe der Seiten laufend beobachtet.
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    const pages = pagesRef.current;
-    if (!scroller || !pages || status !== 'ready') return;
-    const measure = () => setCanScroll(scroller.scrollHeight - scroller.clientHeight > 24);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(pages);
-    observer.observe(scroller);
-    return () => observer.disconnect();
-  }, [status]);
+  const { status, setStatus, pageCount } = usePdfPages({ data: pdf?.data, title, scrollerRef, pagesRef, zoom, margin: immersive ? 0 : 16, attempt });
+  const canScroll = useCanScroll(scrollerRef, pagesRef, status);
 
   // Leertaste startet und stoppt den Bildlauf (auch per Bluetooth-Tastatur oder Pedal).
   useEffect(() => {
@@ -395,38 +465,7 @@ export function PdfModal({ title, file: pdf, durationSeconds = null, onClose }: 
             controlsShown ? 'opacity-100' : 'opacity-0 [&_*]:!pointer-events-none'
           }`}
         >
-          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-stage-line bg-stage-surface/95 p-1.5 shadow-pop backdrop-blur" role="group" aria-label="Automatischer Bildlauf">
-            <IconButton
-              icon={Minus}
-              label="Langsamer"
-              disabled={autoScroll.speedIndex === 0}
-              onClick={() => autoScroll.setSpeedIndex(autoScroll.speedIndex - 1)}
-              className="rounded-full"
-            />
-            <button
-              type="button"
-              onClick={() => autoScroll.setRunning(!autoScroll.running)}
-              disabled={!canScroll}
-              aria-pressed={autoScroll.running}
-              title={canScroll ? 'Leertaste startet und stoppt' : 'Das PDF passt komplett auf den Bildschirm'}
-              className={`flex min-h-touch items-center gap-2 rounded-full px-5 text-[15px] font-semibold transition-colors disabled:opacity-40 ${
-                autoScroll.running ? 'bg-stage-text text-stage-surface' : 'bg-brand text-on-fill hover:bg-brand-strong'
-              }`}
-            >
-              {autoScroll.running ? <Pause className="h-[18px] w-[18px]" aria-hidden /> : <Play className="h-[18px] w-[18px]" aria-hidden />}
-              {autoScroll.running ? 'Pause' : 'Auto-Scroll'}
-            </button>
-            <span className="w-12 text-center text-sm font-semibold tabular-nums text-stage-muted" aria-live="polite" aria-label={`Tempo ${SPEED_STEPS[autoScroll.speedIndex]}-fach`}>
-              {SPEED_STEPS[autoScroll.speedIndex].toLocaleString('de-DE')}×
-            </span>
-            <IconButton
-              icon={Plus}
-              label="Schneller"
-              disabled={autoScroll.speedIndex === SPEED_STEPS.length - 1}
-              onClick={() => autoScroll.setSpeedIndex(autoScroll.speedIndex + 1)}
-              className="rounded-full"
-            />
-          </div>
+          <AutoScrollBar autoScroll={autoScroll} canScroll={canScroll} />
         </div>
       )}
       </div>

@@ -26,6 +26,7 @@ import {
   GripVertical,
   ListMusic,
   MicVocal,
+  MonitorPlay,
   Music,
   Pencil,
   Play,
@@ -481,7 +482,7 @@ function AddSongsModal({ setlist, songs, onClose }: { setlist: Setlist; songs: S
   );
 }
 
-function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist; songsById: Map<string, Song>; onStartStage: () => void }) {
+function SetlistDetail({ setlist, songsById, onStartStage, onStartLive }: { setlist: Setlist; songsById: Map<string, Song>; onStartStage: () => void; onStartLive: () => void }) {
   const { isAdmin } = useAdmin();
   const { toast, confirm } = useFeedback();
   const [adding, setAdding] = useState(false);
@@ -545,9 +546,12 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
             )}
           </div>
         )}
-        <div className="grid grid-cols-[1fr_auto] gap-2 sm:flex sm:shrink-0">
-          <Button variant="primary" icon={Play} onClick={onStartStage} disabled={playable === 0}>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+          <Button variant="primary" icon={Play} onClick={onStartStage} disabled={playable === 0} className="col-span-2">
             Probeansicht starten
+          </Button>
+          <Button icon={MonitorPlay} onClick={onStartLive} disabled={playable === 0} title="Nur die Leadsheets im Vollbild, Song für Song">
+            Live-Ansicht
           </Button>
           <Button icon={Music} onClick={() => setPlaylistOpen(true)} disabled={songs.length === 0} aria-label="Als Playlist (Spotify, Apple Music)" title="Als Playlist für Spotify oder Apple Music">
             Playlist
@@ -584,7 +588,7 @@ function SetlistDetail({ setlist, songsById, onStartStage }: { setlist: Setlist;
   );
 }
 
-export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: string) => void }) {
+export function SetlistBuilder({ onStartStage, onStartLive }: { onStartStage: (setlistId: string) => void; onStartLive: (setlistId: string) => void }) {
   const { isAdmin } = useAdmin();
   const { toast } = useFeedback();
   const setlists = useLiveQuery(() => db.setlists.toArray(), []);
@@ -666,7 +670,7 @@ export function SetlistBuilder({ onStartStage }: { onStartStage: (setlistId: str
               );
             })}
           </ul>
-          {selected && <SetlistDetail key={selected.id} setlist={selected} songsById={songsById} onStartStage={() => onStartStage(selected.id)} />}
+          {selected && <SetlistDetail key={selected.id} setlist={selected} songsById={songsById} onStartStage={() => onStartStage(selected.id)} onStartLive={() => onStartLive(selected.id)} />}
         </div>
       )}
 

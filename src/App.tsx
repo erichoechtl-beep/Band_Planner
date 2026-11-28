@@ -7,17 +7,20 @@ import { Media } from './components/Media';
 import { Rehearsals } from './components/Rehearsals';
 import { SetlistBuilder } from './components/SetlistBuilder';
 import { SongManager } from './components/SongManager';
+import { LiveView } from './components/LiveView';
 import { StageView } from './components/StageView';
 
-type Route = { kind: 'tab'; tab: TabId } | { kind: 'stage'; setlistId: string; index: number };
+/** buehne = Probeansicht, live = Live-Ansicht (nur Leadsheets) */
+type ViewMode = 'buehne' | 'live';
+type Route = { kind: 'tab'; tab: TabId } | { kind: 'stage'; mode: ViewMode; setlistId: string; index: number };
 
 // Hash-Routing funktioniert in jedem GitHub-Pages-Unterordner. Die Zurück-Taste verlässt so die
 // Probeansicht, und beim Neuladen bleibt die aktuelle Song-Position erhalten.
 function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/');
-  if (parts[0] === 'buehne' && parts[1]) {
+  if ((parts[0] === 'buehne' || parts[0] === 'live') && parts[1]) {
     const index = Number(parts[2]);
-    return { kind: 'stage', setlistId: decodeURIComponent(parts[1]), index: Number.isInteger(index) && index >= 0 ? index : 0 };
+    return { kind: 'stage', mode: parts[0], setlistId: decodeURIComponent(parts[1]), index: Number.isInteger(index) && index >= 0 ? index : 0 };
   }
   // Frühere Adresse des Kalenders weiterhin unterstützen
   const target = parts[0] === 'proben' ? 'termine' : parts[0];
@@ -26,8 +29,8 @@ function parseHash(hash: string): Route {
   return { kind: 'tab', tab: tab?.id ?? 'start' };
 }
 
-function stageHash(setlistId: string, index: number): string {
-  return `#/buehne/${encodeURIComponent(setlistId)}/${index}`;
+function stageHash(setlistId: string, index: number, mode: ViewMode = 'buehne'): string {
+  return `#/${mode}/${encodeURIComponent(setlistId)}/${index}`;
 }
 
 export default function App() {
@@ -55,15 +58,33 @@ export default function App() {
     window.location.hash = stageHash(setlistId, 0);
   }, []);
 
-  // Blättern ersetzt den Verlaufseintrag: „Zurück“ führt direkt aus der Probeansicht heraus.
-  const handleStageIndex = useCallback((setlistId: string, index: number) => {
-    window.history.replaceState(null, '', stageHash(setlistId, index));
+  const startLive = useCallback((setlistId: string, index = 0) => {
+    window.location.hash = stageHash(setlistId, index, 'live');
   }, []);
+
+  // Blättern ersetzt den Verlaufseintrag: „Zurück“ führt direkt aus der Probeansicht heraus.
+  const handleStageIndex = useCallback((setlistId: string, index: number, mode: ViewMode = 'buehne') => {
+    window.history.replaceState(null, '', stageHash(setlistId, index, mode));
+  }, []);
+
+  if (route.kind === 'stage' && route.mode === 'live') {
+    const { setlistId, index } = route;
+    return (
+      <LiveView
+        key={setlistId}
+        setlistId={setlistId}
+        initialIndex={index}
+        onIndexChange={(next) => handleStageIndex(setlistId, next, 'live')}
+        onExit={() => selectTab('setlists')}
+      />
+    );
+  }
 
   if (route.kind === 'stage') {
     const { setlistId, index } = route;
     return (
       <StageView
+        onOpenLive={(position) => startLive(setlistId, position)}
         key={setlistId}
         setlistId={setlistId}
         initialIndex={index}
@@ -80,7 +101,7 @@ export default function App() {
       {/* Unten Platz für die Navigationsleiste auf Handy und Tablet */}
       <main className="mx-auto max-w-6xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:pt-8 lg:pb-12">
         {route.tab === 'start' && <Home onNavigate={selectTab} onStartStage={startStage} />}
-        {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} />}
+        {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} onStartLive={(id) => startLive(id)} />}
         {route.tab === 'songs' && <SongManager />}
         {route.tab === 'termine' && <Rehearsals />}
         {route.tab === 'medien' && <Media />}

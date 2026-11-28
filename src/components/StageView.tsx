@@ -12,6 +12,7 @@ import {
   Lock,
   Maximize,
   MicVocal,
+  MonitorPlay,
   Minimize,
   Minus,
   Music2,
@@ -29,38 +30,11 @@ import { db, describeError, SONG_STATUSES, type Setlist, type Song, type SongSta
 import { playableSongIds, STATUS_LABEL, STATUS_SHORT, statusOf } from '../lib/setlist';
 import { parseDuration } from '../lib/time';
 import { formatSemitones, transposeSong } from '../lib/transpose';
+import { useWakeLock } from '../lib/useWakeLock';
 import { ThemeButton } from './Header';
 import { PdfViewer } from './PdfViewer';
 import { SongNotes } from './SongNotes';
 import { Button, IconButton, Modal, StructureFlow } from './ui';
-
-/** Hält das Display an, solange die Probeansicht offen ist (falls das Gerät es unterstützt). */
-function useWakeLock() {
-  useEffect(() => {
-    if (!('wakeLock' in navigator)) return;
-    let lock: WakeLockSentinel | null = null;
-    let active = true;
-
-    const acquire = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const sentinel = await navigator.wakeLock.request('screen');
-        if (active) lock = sentinel;
-        else void sentinel.release();
-      } catch {
-        // z. B. im Energiesparmodus – die Ansicht funktioniert auch ohne.
-      }
-    };
-
-    void acquire();
-    document.addEventListener('visibilitychange', acquire);
-    return () => {
-      active = false;
-      document.removeEventListener('visibilitychange', acquire);
-      void lock?.release();
-    };
-  }, []);
-}
 
 function useFullscreen() {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -160,9 +134,11 @@ interface StageViewProps {
   initialIndex: number;
   onIndexChange: (index: number) => void;
   onExit: () => void;
+  /** Wechselt an der aktuellen Position in die Live-Ansicht (nur Leadsheets). */
+  onOpenLive?: (index: number) => void;
 }
 
-export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: StageViewProps) {
+export function StageView({ setlistId, initialIndex, onIndexChange, onExit, onOpenLive }: StageViewProps) {
   const data = useLiveQuery(async () => {
     const setlist = await db.setlists.get(setlistId);
     if (!setlist) return { setlist: null, songs: [] as Song[] };
@@ -275,6 +251,7 @@ export function StageView({ setlistId, initialIndex, onIndexChange, onExit }: St
               Song {currentIndex + 1} <span className="font-normal text-stage-subtle">von {songs.length}</span>
             </div>
           </div>
+          {onOpenLive && <IconButton icon={MonitorPlay} label="Live-Ansicht (nur Leadsheets)" onClick={() => onOpenLive(currentIndex)} />}
           <IconButton icon={ListOrdered} label="Setlist anzeigen" onClick={() => setPanel('list')} />
           <ThemeButton />
           {fullscreen.isSupported && (
