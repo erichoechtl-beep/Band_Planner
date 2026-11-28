@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { ReactNode } from 'react';
-import { ArrowRight, CalendarDays, Clock, ExternalLink, FileText, FolderOpen, Headphones, ListMusic, MapPin, Music, Play, RefreshCw, WifiOff } from 'lucide-react';
+import { ArrowRight, CalendarDays, Clock, ExternalLink, FileText, FolderOpen, Headphones, ListMusic, MapPin, MonitorPlay, Music, Play, RefreshCw, WifiOff } from 'lucide-react';
 import { SPOTIFY_PLAYLIST_ID } from '../config';
 import { useAdmin } from '../context/AdminContext';
 import { db, type Rehearsal } from '../db/schema';
@@ -14,6 +14,7 @@ import { Button } from './ui';
 interface HomeProps {
   onNavigate: (tab: TabId) => void;
   onStartStage: (setlistId: string) => void;
+  onStartLive: (setlistId: string) => void;
 }
 
 function greeting(hour: number): string {
@@ -136,7 +137,7 @@ function CardTitle({ icon: Icon, children, action }: { icon: typeof Music; child
   );
 }
 
-export function Home({ onNavigate, onStartStage }: HomeProps) {
+export function Home({ onNavigate, onStartStage, onStartLive }: HomeProps) {
   const { isAdmin } = useAdmin();
   const data = useLiveQuery(async () => {
     const [rehearsals, setlists, songs, documents, meta] = await Promise.all([
@@ -184,6 +185,11 @@ export function Home({ onNavigate, onStartStage }: HomeProps) {
             {setlist && (
               <Button variant="primary" icon={Play} onClick={() => onStartStage(setlist.id)} disabled={!canStart}>
                 Probeansicht starten
+              </Button>
+            )}
+            {setlist && (
+              <Button icon={MonitorPlay} onClick={() => onStartLive(setlist.id)} disabled={!canStart} className="border-white/10 bg-white/[0.07] hover:bg-white/[0.12]" title="Nur die Leadsheets im Vollbild, Song für Song">
+                Live-Ansicht
               </Button>
             )}
             <Button icon={ListMusic} onClick={() => onNavigate('setlists')} className="border-white/10 bg-white/[0.07] hover:bg-white/[0.12]">

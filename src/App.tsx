@@ -100,7 +100,7 @@ export default function App() {
       <AutoSyncBanner {...autoSync} />
       {/* Unten Platz für die Navigationsleiste auf Handy und Tablet */}
       <main className="mx-auto max-w-6xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:pt-8 lg:pb-12">
-        {route.tab === 'start' && <Home onNavigate={selectTab} onStartStage={startStage} />}
+        {route.tab === 'start' && <Home onNavigate={selectTab} onStartStage={startStage} onStartLive={(id) => startLive(id)} />}
         {route.tab === 'setlists' && <SetlistBuilder onStartStage={startStage} onStartLive={(id) => startLive(id)} />}
         {route.tab === 'songs' && <SongManager />}
         {route.tab === 'termine' && <Rehearsals />}
