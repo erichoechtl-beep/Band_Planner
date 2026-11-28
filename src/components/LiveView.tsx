@@ -233,11 +233,13 @@ function LivePlayer({ songs, initialIndex, onIndexChange, onExit }: { songs: Son
       <div className={`pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/80 to-transparent pb-8 pt-safe ${fade}`}>
         <div className="flex items-center gap-2 px-2 pt-2">
           <IconButton icon={X} label="Live-Ansicht beenden" onClick={onExit} className="pointer-events-auto rounded-full bg-black/60 text-stage-text" />
-          <div className="min-w-0 flex-1 text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stage-muted">
-              Song {currentIndex + 1} von {songs.length}
-            </p>
-            <h2 className="truncate text-lg font-bold">{song.title}</h2>
+          <div className="flex min-w-0 flex-1 justify-center">
+            <div className="min-w-0 max-w-full rounded-2xl bg-black/75 px-4 py-1.5 text-center shadow-pop backdrop-blur">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stage-muted">
+                Song {currentIndex + 1} von {songs.length}
+              </p>
+              <h2 className="truncate text-lg font-bold">{song.title}</h2>
+            </div>
           </div>
           <div className="pointer-events-auto flex gap-1">
             <IconButton icon={ZoomOut} label="Verkleinern" disabled={zoomIndex === 0} onClick={() => setZoomIndex(zoomIndex - 1)} className="rounded-full bg-black/60 text-stage-text" />
@@ -254,7 +256,7 @@ function LivePlayer({ songs, initialIndex, onIndexChange, onExit }: { songs: Son
 
       {/* Fußleiste: zurück, Auto-Scroll, weiter */}
       <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-10 ${fade}`}>
-        <p className="mb-2 truncate text-center text-sm text-stage-muted">
+        <p className="mx-auto mb-2 w-fit max-w-full truncate rounded-full bg-black/75 px-4 py-1.5 text-center text-sm text-stage-muted shadow-pop backdrop-blur">
           {nextSong ? (
             <>
               <span className="eyebrow mr-2">Als Nächstes</span>
